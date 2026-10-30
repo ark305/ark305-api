@@ -1,6 +1,6 @@
 # Backend de ARK305
 
-API NestJS independiente para la web Next.js y futuros clientes móviles. Esta primera entrega implementa únicamente el arranque y la comprobación de salud; no ofrece reservas ni integra proveedores.
+API NestJS independiente para la web Next.js y futuros clientes móviles. Expone salud y un catálogo demo de solo lectura; no ofrece reservas ni integra proveedores.
 
 ## Iniciar localmente
 
@@ -23,7 +23,7 @@ Comprobar `http://127.0.0.1:3001/api/v1/health`:
 { "status": "ok", "service": "ark305-api" }
 ```
 
-Este resultado indica que el proceso HTTP responde; no certifica disponibilidad de base de datos, IA ni proveedores. La web todavía conserva su backend anterior y no consume automáticamente esta API.
+Este resultado indica que el proceso HTTP responde; no certifica disponibilidad de base de datos, IA ni proveedores. La página `/catalogo` consume esta API; las demás funciones web conservan su implementación anterior.
 
 ## Comandos
 
@@ -48,7 +48,25 @@ $env:PORT = '3002'
 npm run dev:api
 ```
 
-Para un despliegue futuro debe configurarse el host y puerto apropiados. No se ha creado ni publicado un despliegue. El endpoint de salud es público; no hay rutas de negocio, CORS habilitado ni autenticación nueva en esta entrega.
+Para un despliegue futuro debe configurarse el host y puerto apropiados. No se ha creado ni publicado un despliegue. Salud y catálogo son públicos y no contienen datos de usuarios. No se habilita CORS ni autenticación nueva.
+
+## Probar el catálogo
+
+Con ambos procesos iniciados, abrir `http://localhost:3000/catalogo`.
+Next.js consulta NestJS desde el servidor; no requiere CORS. Si la API está apagada, responde con un mensaje de indisponibilidad, sin sustituir datos silenciosamente. El tiempo máximo de consulta es de cinco segundos.
+
+Para cambiar el destino, definir `ARK_API_URL` en el entorno de Next.js o en su `.env.local`, por ejemplo `http://127.0.0.1:3002` (sin `/api/v1`). No es una variable pública ni una credencial.
+
+| Ruta GET | Respuesta |
+|---|---|
+| `/api/v1/catalog` | `{ items: [...] }`, 18 servicios demo. |
+| `/api/v1/catalog/suv` | Servicio individual con identificador, categoría y textos `es`/`en`. |
+
+Cada servicio incluye `source: "demo"`, `bookable: false` y `pricing: { type: "quote" }`. No se publican proveedores ficticios ni las tarifas antiguas no verificadas. Un ID desconocido devuelve 404; un ID fuera de `[a-zA-Z0-9-]` o de 1–64 caracteres devuelve 400. Los identificadores distinguen mayúsculas. No existen operaciones de escritura.
+
+`CatalogPort` es el contrato asíncrono de lectura. `DemoCatalogAdapter` entrega copias de una instantánea de los textos del prototipo; puede reemplazarse en `CatalogModule` sin cambiar el controlador. No representa una integración con proveedores. El planificador anterior mantiene temporalmente su catálogo local: no se sincronizan ambos conjuntos ni se migran reservas en esta entrega.
+
+No se necesita Docker ni base de datos para esta demostración. La persistencia y los adaptadores de proveedores se incorporarán con casos de uso confirmados.
 
 ## Organización y siguiente paso
 
