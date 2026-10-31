@@ -7,7 +7,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
     "start:dev": "tsc-watch -p tsconfig.json --onSuccess \"node dist/main.js\"",
-    "test": "npm run build && node --test test/app.test.cjs test/auth.test.cjs"
+    "test": "npm run build && node --test test/app.test.cjs test/auth.test.cjs test/requests.test.cjs",
+    "test:rls": "node test/requests-rls.cjs"
   },
   "dependencies": {
     "@nestjs/common": "12.3.2",

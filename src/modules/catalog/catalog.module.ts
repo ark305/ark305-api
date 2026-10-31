@@ -6,5 +6,6 @@ import { DemoCatalogAdapter } from './demo-catalog.adapter';
 @Module({
   controllers: [CatalogController],
   providers: [{ provide: CatalogPort, useClass: DemoCatalogAdapter }],
+  exports: [CatalogPort],
 })
 export class CatalogModule {}
