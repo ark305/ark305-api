@@ -7,7 +7,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/main.js",
     "start:dev": "tsc-watch -p tsconfig.json --onSuccess \"node dist/main.js\"",
-    "test": "npm run build && node --test test/app.test.cjs test/auth.test.cjs test/requests.test.cjs",
+    "test": "npm run build && node --test test/app.test.cjs test/auth.test.cjs test/requests.test.cjs test/ai.test.cjs",
     "test:rls": "node test/requests-rls.cjs"
   },
   "dependencies": {

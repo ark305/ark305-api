@@ -101,3 +101,6 @@ Un plan válido incluye `provenance` con `provider`, `model` e identificador `re
 Para comprobarlo al configurar Supabase: iniciar sesión, abrir `/mi-dia` en el puerto 3100, solicitar un plan y revisar en Network el POST `/api/ai` y su `provenance`. No compartir ni registrar el encabezado Authorization. Las pruebas automatizadas usan respuestas simuladas; una prueba autenticada real queda pendiente hasta disponer de configuración y sesión. No hay modo de acceso sin autenticación para desarrollo.
 
 Referencias: [NestJS](https://docs.nestjs.com/first-steps) y [pruebas](https://docs.nestjs.com/fundamentals/testing).
+## Migración de IA en curso
+
+Consulte [AI.md](AI.md) para el nuevo endpoint Nest de conversación general y sus límites. El diagnóstico y la planificación web siguen en Next hasta completar la migración; no se debe cambiar todavía el cliente a Nest.
