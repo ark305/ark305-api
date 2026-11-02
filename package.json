@@ -2,12 +2,14 @@
   "name": "ark305-api",
   "version": "0.1.0",
   "private": true,
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22.9"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/main.js",
-    "start:dev": "tsc-watch -p tsconfig.json --onSuccess \"node dist/main.js\"",
-    "test": "npm run build && node --test test/app.test.cjs test/auth.test.cjs test/requests.test.cjs test/ai.test.cjs",
+    "start": "node --env-file-if-exists=.env.local dist/main.js",
+    "start:dev": "tsc-watch -p tsconfig.json --onSuccess \"node --env-file-if-exists=.env.local dist/main.js\"",
+    "test": "npm run build && node --test test/*.test.cjs",
     "test:rls": "node test/requests-rls.cjs"
   },
   "dependencies": {

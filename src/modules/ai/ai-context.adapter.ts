@@ -3,7 +3,7 @@ import { getSupabaseConfig } from '../identity/supabase-config';
 
 @Injectable()
 export class AiContextAdapter {
-  async load(token: string, userId: string, locale: 'es' | 'en'): Promise<string> {
+  async load(token: string, userId: string, locale: 'es' | 'en', strictQuota = false): Promise<string> {
     const config = getSupabaseConfig();
     if (!config) throw new HttpException({ error: 'auth' }, 401);
     const headers = { apikey: config.publishableKey, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
@@ -12,8 +12,11 @@ export class AiContextAdapter {
         method: 'POST', headers, body: JSON.stringify({ lim: parseInt(process.env.AI_DAILY_LIMIT || '60', 10) }),
         signal: AbortSignal.timeout(5000), redirect: 'error', cache: 'no-store',
       });
+      if (strictQuota && !quota.ok) throw new HttpException({ error: 'quota_unavailable' }, 503);
       // Preserve the generic conversation contract; structured tasks will fail closed.
-      if (quota.ok && await quota.json() === false) throw new HttpException({ error: 'rate_limited' }, 429);
+      const allowed: unknown = quota.ok ? await quota.json() : null;
+      if (allowed === false) throw new HttpException({ error: 'rate_limited' }, 429);
+      if (strictQuota && allowed !== true) throw new HttpException({ error: 'quota_unavailable' }, 503);
     } catch (error) {
       if (error instanceof HttpException) throw error;
       throw new HttpException({ error: 'quota_unavailable' }, 503);
