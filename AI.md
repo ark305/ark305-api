@@ -15,3 +15,7 @@ Nest concentra la autenticación, la cuota, el contexto del perfil y las llamada
 | `ARK_API_URL` | Next, solo servidor | Origen de Nest; por defecto `http://127.0.0.1:3001`, sin `/api/v1`. |
 
 Las tareas estructuradas fallan de forma cerrada si la RPC de cuota no confirma `true`. Las respuestas de planificación y diagnóstico se validan contra el catálogo y el flujo conocidos antes de devolver la procedencia de Meta. Los tests usan servidores locales simulados, sin llamadas a proveedores externos.
+
+## Presupuesto de tiempo del proxy
+
+El BFF de Next espera hasta 80 segundos: hasta 15 segundos de autenticaci?n, cuota y perfil en Nest, m?s los 60 segundos del proveedor y 5 segundos de margen. No reintenta solicitudes. Al desplegar, el l?mite de ejecuci?n de ambas funciones debe permitir estos presupuestos; un l?mite de plataforma menor puede interrumpirlas antes. La regresi?n se verifica con tiempo virtual, sin consumir Meta.
