@@ -1,6 +1,6 @@
 const assert = require('node:assert/strict');
 const { randomBytes } = require('node:crypto');
-const { spawnSync } = require('node:child_process');
+const { spawnSync, spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -8,6 +8,7 @@ const image = 'postgres:17';
 const containerName = `ark305-requests-rls-${randomBytes(12).toString('hex')}`;
 const password = randomBytes(24).toString('hex');
 const migrationPath = path.resolve(__dirname, '../../supabase/migrations/20261031031940_service_requests.sql');
+const managementPath = path.resolve(__dirname, '../../supabase/migrations/20261102232604_request_management.sql');
 const ownerA = '11111111-1111-4111-8111-111111111111';
 const ownerB = '33333333-3333-4333-8333-333333333333';
 
@@ -61,6 +62,20 @@ function sql(script, label, expectSuccess = true) {
 function expectValue(script, expected, label) {
   assert.equal(sql(script, label), expected, label);
   process.stdout.write(`PASS ${label}\n`);
+}
+
+function concurrentSql(script) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('docker', ['--host', dockerHost, 'exec', '-i', containerName,
+      'psql', '-U', 'postgres', '-d', 'ark305_test', '-X', '-q', '-t', '-A', '-v', 'ON_ERROR_STOP=1'],
+    { windowsHide: true, timeout: 15000 });
+    let stdout = ''; let stderr = '';
+    child.stdout.on('data', value => { stdout += value; });
+    child.stderr.on('data', value => { stderr += value; });
+    child.on('error', reject);
+    child.on('close', code => code === 0 ? resolve(stdout.trim()) : reject(new Error(stderr)));
+    child.stdin.end(script);
+  });
 }
 
 function tableHash() {
@@ -173,6 +188,8 @@ RETURNING requester_id::text || ':' || status;`;
     expectValue("SELECT relrowsecurity::text FROM pg_class WHERE oid = 'public.service_requests'::regclass;", 'true', 'row-level security is enabled');
     expectValue("SELECT count(*) FROM pg_indexes WHERE schemaname = 'public' AND tablename = 'service_requests' AND indexname = 'service_requests_owner_created_idx';", '1', 'owner and creation-order index exists');
 
+    sql(fs.readFileSync(managementPath, 'utf8'), 'apply request management migration');
+    await require('./request-management-probe.cjs')({ sql, expectValue, setIdentity, concurrentSql, ownerA, ownerB });
     process.stdout.write('PASS PostgreSQL 17 migration/RLS probe with simulated Supabase Auth claims\n');
   } catch (error) {
     failure = error;
