@@ -1,106 +1,65 @@
 # Backend de ARK305
 
-API NestJS independiente para la web Next.js y futuros clientes móviles. Expone salud y un catálogo demo de solo lectura; no ofrece reservas ni integra proveedores.
+NestJS concentra la API de negocio para la web Next.js y futuros clientes m?viles. Next conserva la presentaci?n y los adaptadores de sesi?n, cookies, redirecci?n, revalidaci?n y carga de im?genes. El cat?logo sigue siendo de demostraci?n: no confirma proveedores, precios finales ni reservas.
 
-## Iniciar localmente
+## Inicio local
 
-Requisito: Node.js 22 o superior. Desde la raíz del repositorio:
+Requisito: Node.js 22.9 o superior. Instalar las dependencias de cada aplicaci?n por separado:
 
 ```powershell
 npm ci
 npm --prefix backend ci
 ```
 
-En una terminal, iniciar la web con `npm run dev` (puerto 3000). En otra, iniciar la API:
+Configurar `backend/.env.local` a partir de [.env.example](.env.example). Los comandos de inicio cargan ese archivo opcional; las variables del proceso tienen prioridad. No se cargan variables desde la carpeta de Next.
 
 ```powershell
+# Terminal del backend (puerto 3001)
 npm run dev:api
+# Otra terminal, web (puerto 3100)
+npm run dev -- --port 3100
 ```
 
-Comprobar `http://127.0.0.1:3001/api/v1/health`:
+En `.env.local` de la ra?z, configurar `ARK_API_URL=http://127.0.0.1:3001`, sin `/api/v1`. Esta variable solo se utiliza en el servidor web. Las variables `META_*` y `AI_DAILY_LIMIT` corresponden al backend, no al navegador ni al servidor Next.
 
-```json
-{ "status": "ok", "service": "ark305-api" }
-```
+## Responsabilidades
 
-Este resultado indica que el proceso HTTP responde; no certifica disponibilidad de base de datos, IA ni proveedores. La página `/catalogo` consume esta API; las demás funciones web conservan su implementación anterior.
-
-## Comandos
-
-| Comando desde la raíz | Resultado |
+| Componente | Responsabilidad |
 |---|---|
-| `npm run dev:api` | Compila TypeScript y reinicia la API al cambiar fuentes. |
-| `npm run build:api` | Compila únicamente el backend. |
-| `npm run test:api` | Compila y prueba el contrato HTTP, sin servicios externos. |
-| `npm --prefix backend start` | Ejecuta la compilación existente. |
-| `npm run lint` / `npm run build` | Verifica la web, no el backend. |
+| `src/modules/identity` | Verificar el Bearer del usuario mediante Supabase. |
+| `src/modules/ai` | Conversaci?n, diagn?stico y Mi d?a con Meta; cuota, validaci?n y procedencia. |
+| `src/modules/profiles` | Perfiles, servicios publicados, preferencias y persistencia del diagn?stico. |
+| `src/modules/requests` | Crear y consultar solicitudes propias; no confirmar reservas. |
+| `src/modules/catalog` | Cat?logo p?blico de demostraci?n. |
+| `src/domain` | Reglas puras del diagn?stico utilizadas por los servicios. |
+| Next | BFF del mismo origen y presentaci?n; nunca respaldo local de IA o escritura directa de negocio. |
 
-El backend tiene su propio `package-lock.json`; sus dependencias se instalan por separado. La compilación estricta y las pruebas son sus comprobaciones actuales; todavía no tiene un comando de lint propio.
+Consultar [AI.md](AI.md) y [PROFILES.md](PROFILES.md) para contratos espec?ficos. Los tipos y reglas puras necesarios para mostrar formularios pueden existir en la web; Nest es quien autoriza y valida las operaciones persistentes.
 
-## Configuración
+## Seguridad y configuraci?n
 
-Por defecto escucha en `127.0.0.1:3001`, separado de Next.js. Se leen `PORT` y `HOST` del entorno del proceso; no se cargan archivos `.env` automáticamente.
+- `SUPABASE_URL` y `SUPABASE_PUBLISHABLE_KEY`: mismo proyecto que la web. No usar `service_role`.
+- Cada operaci?n privada reenv?a el JWT del usuario y conserva las pol?ticas RLS existentes.
+- Los perfiles p?blicos no incluyen el diagn?stico ni las preferencias privadas.
+- `META_API_KEY`: secreto exclusivo del backend. `META_MODEL` predeterminado: `muse-spark-1.3`.
+- Los modos estructurados solo aceptan el origen oficial de Meta. Las pruebas interceptan HTTP; no consumen cuota real.
+- `PORT` predeterminado: `3001`; `HOST`: `127.0.0.1`. El despliegue deber? definirlos seg?n el entorno.
+- Next consulta Nest desde el servidor: no necesita CORS para estas rutas.
 
-Ejemplo en la terminal dedicada a la API:
+## Verificaci?n
 
 ```powershell
-$env:PORT = '3002'
-npm run dev:api
+npm run test:api
+node --test test/*.test.mjs
+npm run lint
+npx tsc --noEmit
+npm run build
 ```
 
-Para un despliegue futuro debe configurarse el host y puerto apropiados. No se ha creado ni publicado un despliegue. Salud y catálogo son públicos y no contienen datos de usuarios. No se habilita CORS ni autenticación nueva.
+La suite backend compila y ejecuta las pruebas `*.test.cjs`; no ejecuta la prueba remota RLS (`test:rls`). Las suites locales usan servicios HTTP controlados y no demuestran disponibilidad de Meta o Supabase en producci?n.
 
-## Probar el catálogo
+`GET /api/v1/health` responde `{ "status": "ok", "service": "ark305-api" }`; confirma el proceso, no la disponibilidad de sus dependencias.
 
-Con ambos procesos iniciados, abrir `http://localhost:3000/catalogo`.
-Next.js consulta NestJS desde el servidor; no requiere CORS. Si la API está apagada, responde con un mensaje de indisponibilidad, sin sustituir datos silenciosamente. El tiempo máximo de consulta es de cinco segundos.
+## Despliegue pendiente
 
-Para cambiar el destino, definir `ARK_API_URL` en el entorno de Next.js o en su `.env.local`, por ejemplo `http://127.0.0.1:3002` (sin `/api/v1`). No es una variable pública ni una credencial.
-
-| Ruta GET | Respuesta |
-|---|---|
-| `/api/v1/catalog` | `{ items: [...] }`, 18 servicios demo. |
-| `/api/v1/catalog/suv` | Servicio individual con identificador, categoría y textos `es`/`en`. |
-
-Cada servicio incluye `source: "demo"`, `bookable: false` y `pricing: { type: "quote" }`. No se publican proveedores ficticios ni las tarifas antiguas no verificadas. Un ID desconocido devuelve 404; un ID fuera de `[a-zA-Z0-9-]` o de 1–64 caracteres devuelve 400. Los identificadores distinguen mayúsculas. No existen operaciones de escritura.
-
-`CatalogPort` es el contrato asíncrono de lectura. `DemoCatalogAdapter` entrega copias de una instantánea de los textos del prototipo; puede reemplazarse en `CatalogModule` sin cambiar el controlador. No representa una integración con proveedores. El planificador anterior mantiene temporalmente su catálogo local: no se sincronizan ambos conjuntos ni se migran reservas en esta entrega.
-
-No se necesita Docker ni base de datos para esta demostración. La persistencia y los adaptadores de proveedores se incorporarán con casos de uso confirmados.
-
-## Organización y siguiente paso
-
-- `src/main.ts`: arranque y cierre del proceso.
-- `src/app.ts`: construcción compartida de la aplicación para ejecución y pruebas.
-- `src/app.module.ts`: composición de módulos.
-- `src/modules/health/`: primer módulo HTTP.
-- `test/app.test.cjs`: pruebas de contrato mediante `node:test` y un puerto local efímero.
-
-La estructura propuesta para próximos módulos separará HTTP, casos de uso, reglas de negocio y adaptadores de persistencia/proveedores. No se crean interfaces vacías ni servicios ficticios hasta definir el primer caso de uso.
-
-La migración será incremental: mover cada comportamiento con sus pruebas y adaptar la web a su contrato. No duplicar reglas entre Next.js y NestJS. La autenticación y permisos deberán diseñarse antes de exponer datos o acciones de usuarios. La IA usa Meta, pero todavía vive en Next.js; no se ha migrado a NestJS.
-
-## Ubicación y configuración de IA
-
-`src/app/api/ai/route.ts` (desde la raíz del repositorio) expone `POST /api/ai` en la web. Usa `META_API_KEY`, `META_MODEL` (por defecto `muse-spark-1.3`) y `META_BASE_URL` (por defecto `https://api.meta.ai`, sin `/v1`). Configurarlas en el `.env.local` de la raíz; reiniciar Next.js después de cambiarlas. `META_MODEL_QUICK` es opcional y utiliza `META_MODEL` si se omite.
-
-La llamada a Meta utiliza `/v1/messages` y autenticación Bearer. Se conserva el contrato `{ text, user }`, la verificación de sesión Supabase y el límite diario existente. Para probar el recorrido completo también se necesita Supabase configurado y una sesión válida; la clave de Meta por sí sola no inicia sesión. No se registran cuerpos de error del proveedor ni se exponen credenciales en el navegador.
-
-Pruebas locales sin credenciales ni llamadas externas: `node --test test/ai-route.test.mjs`, desde la raíz. Las pruebas invocan el manejador POST con dependencias HTTP simuladas.
-
-Referencia: [Messages API de Meta](https://dev.meta.ai/docs/protocols/messages).
-
-### Mi día y respuestas verificables
-
-La pantalla web `/mi-dia` envía una solicitud autenticada a `/api/ai` con `task: "day-plan"`. Sin configuración de Supabase muestra un aviso; sin sesión solicita iniciar sesión. No ejecuta el planificador local como respaldo.
-
-El servidor pide JSON estructurado y valida servicios contra el catálogo del prototipo, horarios, cantidades e invitados. Si Meta no propone servicios adecuados, devuelve un plan vacío; una respuesta inválida o incompleta produce un error, nunca un paquete predeterminado. La comprobación de cuota debe devolver `true` para permitir esta tarea; si falta la función `bump_ai` o falla, no se llama a Meta.
-
-Un plan válido incluye `provenance` con `provider`, `model` e identificador `responseId` devueltos por el proveedor. La pantalla muestra esos datos junto al plan. Esto permite correlacionar la respuesta, no constituye una firma criptográfica. El resumen visual se construye a partir del plan; precios y servicios siguen siendo de demostración, sin confirmar reservas.
-
-Para comprobarlo al configurar Supabase: iniciar sesión, abrir `/mi-dia` en el puerto 3100, solicitar un plan y revisar en Network el POST `/api/ai` y su `provenance`. No compartir ni registrar el encabezado Authorization. Las pruebas automatizadas usan respuestas simuladas; una prueba autenticada real queda pendiente hasta disponer de configuración y sesión. No hay modo de acceso sin autenticación para desarrollo.
-
-Referencias: [NestJS](https://docs.nestjs.com/first-steps) y [pruebas](https://docs.nestjs.com/fundamentals/testing).
-## Migración de IA en curso
-
-Consulte [AI.md](AI.md) para el nuevo endpoint Nest de conversación general y sus límites. El diagnóstico y la planificación web siguen en Next hasta completar la migración; no se debe cambiar todavía el cliente a Nest.
+No se ha publicado este backend. Primero se cierra y verifica la migraci?n; despu?s se configura un proyecto Vercel separado con ra?z `backend/`, variables privadas y la URL HTTPS en `ARK_API_URL` de Next. La creaci?n de otro repositorio es una fase posterior. No se incluyen credenciales en Git.
