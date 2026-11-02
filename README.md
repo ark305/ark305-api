@@ -78,6 +78,26 @@ No se necesita Docker ni base de datos para esta demostración. La persistencia 
 
 La estructura propuesta para próximos módulos separará HTTP, casos de uso, reglas de negocio y adaptadores de persistencia/proveedores. No se crean interfaces vacías ni servicios ficticios hasta definir el primer caso de uso.
 
-La migración será incremental: mover cada comportamiento con sus pruebas y adaptar la web a su contrato. No duplicar reglas entre Next.js y NestJS. La autenticación y permisos deberán diseñarse antes de exponer datos o acciones de usuarios. La integración Anthropic actual permanece sin cambios; Meta se abordará por separado.
+La migración será incremental: mover cada comportamiento con sus pruebas y adaptar la web a su contrato. No duplicar reglas entre Next.js y NestJS. La autenticación y permisos deberán diseñarse antes de exponer datos o acciones de usuarios. La IA usa Meta, pero todavía vive en Next.js; no se ha migrado a NestJS.
+
+## Ubicación y configuración de IA
+
+`src/app/api/ai/route.ts` (desde la raíz del repositorio) expone `POST /api/ai` en la web. Usa `META_API_KEY`, `META_MODEL` (por defecto `muse-spark-1.3`) y `META_BASE_URL` (por defecto `https://api.meta.ai`, sin `/v1`). Configurarlas en el `.env.local` de la raíz; reiniciar Next.js después de cambiarlas. `META_MODEL_QUICK` es opcional y utiliza `META_MODEL` si se omite.
+
+La llamada a Meta utiliza `/v1/messages` y autenticación Bearer. Se conserva el contrato `{ text, user }`, la verificación de sesión Supabase y el límite diario existente. Para probar el recorrido completo también se necesita Supabase configurado y una sesión válida; la clave de Meta por sí sola no inicia sesión. No se registran cuerpos de error del proveedor ni se exponen credenciales en el navegador.
+
+Pruebas locales sin credenciales ni llamadas externas: `node --test test/ai-route.test.mjs`, desde la raíz. Las pruebas invocan el manejador POST con dependencias HTTP simuladas.
+
+Referencia: [Messages API de Meta](https://dev.meta.ai/docs/protocols/messages).
+
+### Mi día y respuestas verificables
+
+La pantalla web `/mi-dia` envía una solicitud autenticada a `/api/ai` con `task: "day-plan"`. Sin configuración de Supabase muestra un aviso; sin sesión solicita iniciar sesión. No ejecuta el planificador local como respaldo.
+
+El servidor pide JSON estructurado y valida servicios contra el catálogo del prototipo, horarios, cantidades e invitados. Si Meta no propone servicios adecuados, devuelve un plan vacío; una respuesta inválida o incompleta produce un error, nunca un paquete predeterminado. La comprobación de cuota debe devolver `true` para permitir esta tarea; si falta la función `bump_ai` o falla, no se llama a Meta.
+
+Un plan válido incluye `provenance` con `provider`, `model` e identificador `responseId` devueltos por el proveedor. La pantalla muestra esos datos junto al plan. Esto permite correlacionar la respuesta, no constituye una firma criptográfica. El resumen visual se construye a partir del plan; precios y servicios siguen siendo de demostración, sin confirmar reservas.
+
+Para comprobarlo al configurar Supabase: iniciar sesión, abrir `/mi-dia` en el puerto 3100, solicitar un plan y revisar en Network el POST `/api/ai` y su `provenance`. No compartir ni registrar el encabezado Authorization. Las pruebas automatizadas usan respuestas simuladas; una prueba autenticada real queda pendiente hasta disponer de configuración y sesión. No hay modo de acceso sin autenticación para desarrollo.
 
 Referencias: [NestJS](https://docs.nestjs.com/first-steps) y [pruebas](https://docs.nestjs.com/fundamentals/testing).
