@@ -45,7 +45,7 @@ function parseCreateRequest(body: unknown): CreateServiceRequest {
   };
 }
 
-function accessToken(request: AuthenticatedRequest): string {
+export function accessToken(request: AuthenticatedRequest): string {
   if (!request.principal) throw new UnauthorizedException();
   const match = typeof request.headers.authorization === 'string' &&
     /^Bearer ([^\s,]+)$/i.exec(request.headers.authorization);

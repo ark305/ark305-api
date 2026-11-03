@@ -1,6 +1,7 @@
-import { Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { getSupabaseConfig } from '../identity/supabase-config';
 import { CreateServiceRequest, RequestsPort, ServiceRequest } from './requests.port';
+import { RequestStatus } from './request-lifecycle';
 
 const COLUMNS = 'id,requester_id,service_id,requested_date,guests,preferences,status,created_at';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -38,6 +39,44 @@ function mapRow(value: unknown, ownerId: string): ServiceRequest | null {
 
 @Injectable()
 export class SupabaseRequestsAdapter extends RequestsPort {
+  private async requireAdministrator(token: string, actorId: string): Promise<void> {
+    const rows = await this.query(token, {
+      method: 'GET', table: 'request_administrators',
+      search: { select: 'user_id', user_id: `eq.${actorId}`, limit: '2' },
+    });
+    if (!Array.isArray(rows)) throw new ServiceUnavailableException('Request storage unavailable');
+    if (rows.length === 0) throw new ForbiddenException('Request administration required');
+    if (rows.length !== 1 || !isRecord(rows[0]) || rows[0].user_id !== actorId) {
+      throw new ServiceUnavailableException('Request storage unavailable');
+    }
+  }
+
+  async listAdmin(token: string, actorId: string): Promise<Array<ServiceRequest & { requesterId: string }>> {
+    await this.requireAdministrator(token, actorId);
+    const rows = await this.query(token, { method: 'GET', search: { order: 'created_at.desc,id.desc', limit: '50' } });
+    if (!Array.isArray(rows) || rows.length > 50) throw new ServiceUnavailableException('Request storage unavailable');
+    return rows.map(value => {
+      const owner = isRecord(value) && typeof value.requester_id === 'string' ? value.requester_id : '';
+      const row = mapRow(value, owner);
+      if (!row) throw new ServiceUnavailableException('Request storage unavailable');
+      return { ...row, requesterId: owner };
+    });
+  }
+
+  async transition(token: string, actorId: string, id: string, expectedStatus: RequestStatus, status: RequestStatus): Promise<ServiceRequest> {
+    await this.requireAdministrator(token, actorId);
+    const rows = await this.query(token, {
+      method: 'PATCH', search: { id: `eq.${id}`, status: `eq.${expectedStatus}` },
+      headers: { Prefer: 'return=representation' }, body: JSON.stringify({ status }),
+    });
+    if (!Array.isArray(rows)) throw new ServiceUnavailableException('Request storage unavailable');
+    if (rows.length === 0) throw new ConflictException('Request changed or is unavailable; refresh before retrying');
+    const owner = isRecord(rows[0]) && typeof rows[0].requester_id === 'string' ? rows[0].requester_id : '';
+    const row = rows.length === 1 ? mapRow(rows[0], owner) : null;
+    if (!row || row.id !== id || row.status !== status) throw new ServiceUnavailableException('Request storage unavailable');
+    return row;
+  }
+
   async create(token: string, ownerId: string, request: CreateServiceRequest): Promise<ServiceRequest> {
     const rows = await this.query(token, {
       method: 'POST',
@@ -83,11 +122,11 @@ export class SupabaseRequestsAdapter extends RequestsPort {
 
   private async query(
     token: string,
-    options: { method: 'GET' | 'POST'; search?: Record<string, string>; headers?: Record<string, string>; body?: string },
+    options: { method: 'GET' | 'POST' | 'PATCH'; table?: 'request_administrators'; search?: Record<string, string>; headers?: Record<string, string>; body?: string },
   ): Promise<unknown> {
     const config = getSupabaseConfig();
     if (!config) throw new ServiceUnavailableException('Request storage unavailable');
-    const url = new URL('/rest/v1/service_requests', config.url);
+    const url = new URL(`/rest/v1/${options.table ?? 'service_requests'}`, config.url);
     url.searchParams.set('select', COLUMNS);
     for (const [key, value] of Object.entries(options.search ?? {})) url.searchParams.set(key, value);
 
