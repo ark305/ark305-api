@@ -1,71 +1,51 @@
-# Backend de ARK305
+# API de ARK305
 
-NestJS concentra la API de negocio para la web Next.js y futuros clientes m?viles. Next conserva la presentaci?n y los adaptadores de sesi?n, cookies, redirecci?n, revalidaci?n y carga de im?genes. El cat?logo sigue siendo de demostraci?n: no confirma proveedores, precios finales ni reservas.
+Backend NestJS independiente para la web y futuros clientes móviles. Este paquete no requiere archivos ni dependencias del repositorio web `ark305`.
 
 ## Inicio local
 
-Requisito: Node.js 22.9 o superior. Instalar las dependencias de cada aplicaci?n por separado:
+Requisito: Node.js 22.9 o superior.
 
-```powershell
+```sh
 npm ci
-npm --prefix backend ci
+# Crear .env.local a partir de .env.example y configurar los valores privados.
+npm run start:dev
 ```
 
-Configurar `backend/.env.local` a partir de [.env.example](.env.example). Los comandos de inicio cargan ese archivo opcional; las variables del proceso tienen prioridad. No se cargan variables desde la carpeta de Next.
+El API escucha por defecto en `http://127.0.0.1:3001`. `PORT` y `HOST` permiten configurarlo. Los scripts cargan `.env.local` opcionalmente; las variables del proceso tienen prioridad. Nunca se versionan credenciales.
 
-```powershell
-# Terminal del backend (puerto 3001)
-npm run dev:api
-# Otra terminal, web (puerto 3100)
-npm run dev
-```
-
-En `frontend/.env.local`, configurar `ARK_API_URL=http://127.0.0.1:3001`, sin `/api/v1`. Esta variable solo se utiliza en el servidor web. Las variables `META_*` y `AI_DAILY_LIMIT` corresponden al backend, no al navegador ni al servidor Next.
+En el repositorio web, configurar `frontend/.env.local` con `ARK_API_URL=http://127.0.0.1:3001`, sin `/api/v1`. La web se inicia por separado en el puerto 3100. No colocar claves de Meta en Next.
 
 ## Responsabilidades
 
-| Componente | Responsabilidad |
-|---|---|
-| `src/modules/identity` | Verificar el Bearer del usuario mediante Supabase. |
-| `src/modules/ai` | Conversaci?n, diagn?stico y Mi d?a con Meta; cuota, validaci?n y procedencia. |
-| `src/modules/profiles` | Perfiles, servicios publicados, preferencias y persistencia del diagn?stico. |
-| `src/modules/requests` | Crear y consultar solicitudes propias; no confirmar reservas. |
-| `src/modules/catalog` | Cat?logo p?blico de demostraci?n. |
-| `src/domain` | Reglas puras del diagn?stico utilizadas por los servicios. |
-| Next | BFF del mismo origen y presentaci?n; nunca respaldo local de IA o escritura directa de negocio. |
+- Identidad: JWT de Supabase verificado y políticas RLS por usuario.
+- IA: conversación, diagnóstico y Mi día mediante Meta, con cuota y procedencia.
+- Perfiles: datos, servicios, preferencias y diagnóstico guardado.
+- Solicitudes: creación, historial y gestión administrativa autorizada; cerrar no confirma una reserva ni un pago.
+- Catálogo: demostración, sin disponibilidad de proveedores confirmada.
 
-Consultar [AI.md](AI.md) y [PROFILES.md](PROFILES.md) para contratos espec?ficos. Los tipos y reglas puras necesarios para mostrar formularios pueden existir en la web; Nest es quien autoriza y valida las operaciones persistentes.
+Contratos: [IA](AI.md), [autenticación](AUTH.md), [perfiles](PROFILES.md) y [solicitudes](REQUESTS.md).
 
-## Seguridad y configuraci?n
+## Snapshot
 
-- `SUPABASE_URL` y `SUPABASE_PUBLISHABLE_KEY`: mismo proyecto que la web. No usar `service_role`.
-- Cada operaci?n privada reenv?a el JWT del usuario y conserva las pol?ticas RLS existentes.
-- Los perfiles p?blicos no incluyen el diagn?stico ni las preferencias privadas.
-- `META_API_KEY`: secreto exclusivo del backend. `META_MODEL` predeterminado: `muse-spark-1.3`.
-- Los modos estructurados solo aceptan el origen oficial de Meta. Las pruebas interceptan HTTP; no consumen cuota real.
-- `PORT` predeterminado: `3001`; `HOST`: `127.0.0.1`. El despliegue deber? definirlos seg?n el entorno.
-- Next consulta Nest desde el servidor: no necesita CORS para estas rutas.
+`POST /api/v1/profiles/snapshot` recibe `{ "answers": { "who": "individual" } }` y devuelve `{ "snapshot": ... }` con `Cache-Control: no-store`. Es un cálculo público sin estado: no consulta cuentas, guarda datos ni llama a Meta. Acepta solo `answers`, hasta 80 claves y un cuerpo de hasta 16 KiB; las entradas malformadas responden 400.
 
-## Verificaci?n
+## Verificación
 
-```powershell
-npm run test:api
-npm run test:web
-npm run lint
-npm run typecheck
+```sh
+npm test
 npm run build
+npm start
 ```
 
-La suite backend compila y ejecuta las pruebas `*.test.cjs`; no ejecuta la prueba remota RLS (`test:rls`). Las suites locales usan servicios HTTP controlados y no demuestran disponibilidad de Meta o Supabase en producci?n.
+`npm test` compila y ejecuta pruebas HTTP con dependencias controladas, sin llamadas a Meta ni bases remotas. `GET /api/v1/health` confirma el proceso, no la disponibilidad de proveedores.
 
-`GET /api/v1/health` responde `{ "status": "ok", "service": "ark305-api" }`; confirma el proceso, no la disponibilidad de sus dependencias.
+La prueba opcional `npm run test:rls` requiere Docker local y la imagen `postgres:17` ya instalada. Crea y elimina únicamente su contenedor aislado, sin red ni puertos publicados. No descarga imágenes ni modifica Supabase remoto.
 
-## Cálculo de Snapshot
+## Esquemas y procedencia
 
-`POST /api/v1/profiles/snapshot` recibe `{ "answers": { "who": "individual" } }` y devuelve `{ "snapshot": ... }` con `Cache-Control: no-store`. Es un cálculo público sin estado: no consulta cuentas, no guarda datos y no llama a Meta. Reutiliza el dominio de diagnóstico de Nest y conserva los resultados anteriores de los cuatro tipos de público.
+`supabase/` conserva los SQL originales y las migraciones de solicitudes. Trasladarlos no los aplica ni garantiza que reconstruyan el esquema completo de producción. Antes de ejecutar SQL, reconciliarlo con el entorno de destino; no aplicar `002_experiences.sql` a ciegas.
 
-Solo admite la propiedad `answers`, un objeto con hasta 80 claves y un cuerpo de hasta 16 KiB. Las entradas malformadas responden 400. Las rutas privadas de perfiles mantienen sus controles de identidad. Prueba focalizada: `node --test backend/test/snapshot.test.cjs backend/test/profiles.test.cjs` desde la raíz.
+`docs/origen-monorepo/` conserva documentos históricos para trazabilidad. Sus rutas y comandos reflejan el monorepo anterior; esta guía define el funcionamiento independiente actual.
 
-## Despliegue pendiente
-
-No se ha publicado este backend. Primero se cierra y verifica la migraci?n; despu?s se configura un proyecto Vercel separado con ra?z `backend/`, variables privadas y la URL HTTPS en `ARK_API_URL` de Next. La creaci?n de otro repositorio es una fase posterior. No se incluyen credenciales en Git.
+El historial de `backend/` fue extraído del repositorio web, sin reescribirlo. El despliegue sigue pendiente: el proyecto del API debe utilizar la raíz de este repositorio, configurar sus variables privadas y exponer una URL HTTPS para `ARK_API_URL`.

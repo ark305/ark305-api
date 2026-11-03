@@ -7,8 +7,8 @@ const path = require('node:path');
 const image = 'postgres:17';
 const containerName = `ark305-requests-rls-${randomBytes(12).toString('hex')}`;
 const password = randomBytes(24).toString('hex');
-const migrationPath = path.resolve(__dirname, '../../supabase/migrations/20261031031940_service_requests.sql');
-const managementPath = path.resolve(__dirname, '../../supabase/migrations/20261102232604_request_management.sql');
+const migrationPath = path.resolve(__dirname, '../supabase/migrations/20261031031940_service_requests.sql');
+const managementPath = path.resolve(__dirname, '../supabase/migrations/20261102232604_request_management.sql');
 const ownerA = '11111111-1111-4111-8111-111111111111';
 const ownerB = '33333333-3333-4333-8333-333333333333';
 
