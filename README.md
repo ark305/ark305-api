@@ -17,10 +17,10 @@ Configurar `backend/.env.local` a partir de [.env.example](.env.example). Los co
 # Terminal del backend (puerto 3001)
 npm run dev:api
 # Otra terminal, web (puerto 3100)
-npm run dev -- --port 3100
+npm run dev
 ```
 
-En `.env.local` de la ra?z, configurar `ARK_API_URL=http://127.0.0.1:3001`, sin `/api/v1`. Esta variable solo se utiliza en el servidor web. Las variables `META_*` y `AI_DAILY_LIMIT` corresponden al backend, no al navegador ni al servidor Next.
+En `frontend/.env.local`, configurar `ARK_API_URL=http://127.0.0.1:3001`, sin `/api/v1`. Esta variable solo se utiliza en el servidor web. Las variables `META_*` y `AI_DAILY_LIMIT` corresponden al backend, no al navegador ni al servidor Next.
 
 ## Responsabilidades
 
@@ -50,7 +50,7 @@ Consultar [AI.md](AI.md) y [PROFILES.md](PROFILES.md) para contratos espec?ficos
 
 ```powershell
 npm run test:api
-node --test test/*.test.mjs
+npm run test:web
 npm run lint
 npx tsc --noEmit
 npm run build
