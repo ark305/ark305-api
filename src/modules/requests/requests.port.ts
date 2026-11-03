@@ -1,3 +1,5 @@
+import type { RequestStatus } from './request-lifecycle';
+
 export type CreateServiceRequest = {
   serviceId: string;
   requestedDate: string;
@@ -11,7 +13,7 @@ export type ServiceRequest = {
   requestedDate: string;
   guests: number;
   preferences: string;
-  status: 'received';
+  status: RequestStatus;
   createdAt: string;
 };
 

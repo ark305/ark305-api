@@ -22,6 +22,7 @@ test('service requests are authenticated and scoped to the verified owner', asyn
     if (storageMode === 'malformed-json') return res.end('{');
     if (storageMode === 'malformed-shape') return res.end(JSON.stringify({ unexpected: true }));
     if (storageMode === 'empty-write' && req.method === 'POST') return res.end('[]');
+    if (storageMode === 'wrong-status') return res.end(JSON.stringify([{ ...rows[0], status: 'closed' }]));
     if (storageMode === 'wrong-owner') {
       const foreignRow = rows.find(row => row.requester_id !== requesterId);
       return res.end(JSON.stringify(foreignRow ? [foreignRow] : []));
@@ -106,9 +107,23 @@ test('service requests are authenticated and scoped to the verified owner', asyn
     assert.equal((await fetch(`${base}/${requestId}`, { headers: otherHeaders })).status, 404);
     assert.equal((await fetch(`${base}/not-a-uuid`, { headers })).status, 400);
   });
+  await t.test('list and detail preserve allowed management states without exposing other owners', async () => {
+    const row = rows.find(item => item.requester_id === owner);
+    for (const status of ['received', 'in_progress', 'closed', 'cancelled']) {
+      row.status = status;
+      const list = await fetch(base, { headers });
+      assert.equal(list.status, 200, status);
+      assert.equal((await list.json()).items[0].status, status);
+      assert.equal((await (await fetch(`${base}/${requestId}`, { headers })).json()).status, status);
+      assert.equal((await fetch(`${base}/${otherRequestId}`, { headers })).status, 404);
+    }
+    row.status = 'confirmed';
+    assert.equal((await fetch(base, { headers })).status, 503);
+    row.status = 'received';
+  });
   await t.test('persistence failures never fabricate success or mutate rows', async () => {
     const before = JSON.stringify(rows);
-    for (const mode of ['fail', 'malformed-json', 'malformed-shape', 'wrong-owner', 'empty-write']) {
+    for (const mode of ['fail', 'malformed-json', 'malformed-shape', 'wrong-owner', 'empty-write', 'wrong-status']) {
       storageMode = mode;
       const response = await fetch(base, { method: 'POST', headers, body: JSON.stringify(valid) });
       assert.equal(response.status, 503, mode);

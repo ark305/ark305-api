@@ -22,7 +22,7 @@ function mapRow(value: unknown, ownerId: string): ServiceRequest | null {
       typeof value.service_id !== 'string' || !isDate(value.requested_date) ||
       !Number.isInteger(value.guests) || Number(value.guests) < 1 || Number(value.guests) > 20 ||
       typeof value.preferences !== 'string' || value.preferences.length > 2000 ||
-      value.status !== 'received' || typeof value.created_at !== 'string' ||
+      (value.status !== 'received' && value.status !== 'in_progress' && value.status !== 'closed' && value.status !== 'cancelled') || typeof value.created_at !== 'string' ||
       !Number.isFinite(Date.parse(value.created_at))) return null;
 
   return {
@@ -31,7 +31,7 @@ function mapRow(value: unknown, ownerId: string): ServiceRequest | null {
     requestedDate: value.requested_date,
     guests: Number(value.guests),
     preferences: value.preferences,
-    status: 'received',
+    status: value.status,
     createdAt: value.created_at,
   };
 }
@@ -50,7 +50,7 @@ export class SupabaseRequestsAdapter extends RequestsPort {
       }),
     });
     const row = Array.isArray(rows) && rows.length === 1 ? mapRow(rows[0], ownerId) : null;
-    if (!row) throw new ServiceUnavailableException('Request storage unavailable');
+    if (!row || row.status !== 'received') throw new ServiceUnavailableException('Request storage unavailable');
     return row;
   }
 
