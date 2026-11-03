@@ -1,5 +1,5 @@
 import {
-  BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Header, Param,
+  BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Header, HttpCode, Param,
   Patch, Post, Put, Query, Req, UnauthorizedException,
 } from '@nestjs/common';
 import { Answers, buildSnapshot, sanitize } from '../../domain/diagnosis';
@@ -82,6 +82,16 @@ function validateService(input: unknown, ownerId: string): ServiceInput {
 @Controller('profiles')
 export class ProfilesController {
   constructor(private readonly profiles: ProfilesPort) {}
+
+  @Post('snapshot') @Public() @HttpCode(200) @Header('Cache-Control', 'no-store')
+  snapshot(@Body() body: unknown) {
+    if (!isRecord(body) || Object.keys(body).length !== 1 || !isRecord(body.answers) ||
+        Object.keys(body.answers).length > 80 || Buffer.byteLength(JSON.stringify(body), 'utf8') > 16_384) {
+      throw new BadRequestException('Invalid snapshot input');
+    }
+    const answers = sanitize(body.answers);
+    return { snapshot: buildSnapshot(answers) };
+  }
 
   @Get('me') @Header('Cache-Control', 'no-store')
   async viewer(@Req() request: AuthenticatedRequest) {

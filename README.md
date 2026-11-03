@@ -52,13 +52,19 @@ Consultar [AI.md](AI.md) y [PROFILES.md](PROFILES.md) para contratos espec?ficos
 npm run test:api
 npm run test:web
 npm run lint
-npx tsc --noEmit
+npm run typecheck
 npm run build
 ```
 
 La suite backend compila y ejecuta las pruebas `*.test.cjs`; no ejecuta la prueba remota RLS (`test:rls`). Las suites locales usan servicios HTTP controlados y no demuestran disponibilidad de Meta o Supabase en producci?n.
 
 `GET /api/v1/health` responde `{ "status": "ok", "service": "ark305-api" }`; confirma el proceso, no la disponibilidad de sus dependencias.
+
+## Cálculo de Snapshot
+
+`POST /api/v1/profiles/snapshot` recibe `{ "answers": { "who": "individual" } }` y devuelve `{ "snapshot": ... }` con `Cache-Control: no-store`. Es un cálculo público sin estado: no consulta cuentas, no guarda datos y no llama a Meta. Reutiliza el dominio de diagnóstico de Nest y conserva los resultados anteriores de los cuatro tipos de público.
+
+Solo admite la propiedad `answers`, un objeto con hasta 80 claves y un cuerpo de hasta 16 KiB. Las entradas malformadas responden 400. Las rutas privadas de perfiles mantienen sus controles de identidad. Prueba focalizada: `node --test backend/test/snapshot.test.cjs backend/test/profiles.test.cjs` desde la raíz.
 
 ## Despliegue pendiente
 
