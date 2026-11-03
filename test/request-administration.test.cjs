@@ -14,7 +14,12 @@ test('administrative requests require verified membership and expected-state wri
     res.setHeader('Content-Type', 'application/json');
     const isAdmin = req.headers.authorization === 'Bearer admin-session';
     const url = new URL(req.url, 'http://test');
-    if (url.pathname === '/auth/v1/user') return res.end(JSON.stringify({ id: isAdmin ? admin : owner, user_metadata: { role: 'admin' } }));
+    if (url.pathname === '/auth/v1/user') return res.end(JSON.stringify({ id: isAdmin ? admin : req.headers.authorization === 'Bearer stranger-session' ? '33333333-3333-4333-8333-333333333333' : owner, user_metadata: { role: 'admin' } }));
+    if (url.pathname === '/rest/v1/service_request_events') {
+      assert.equal(url.searchParams.get('request_id'), `eq.${id}`);
+      return res.end(JSON.stringify([{ id: '44444444-4444-4444-8444-444444444444', request_id: mode === 'foreign-event' ? admin : id,
+        from_status: 'received', to_status: 'in_progress', created_at: '2026-11-01T13:00:00Z', actor_id: admin }]));
+    }
     if (url.pathname === '/rest/v1/request_administrators') {
       if (mode === 'membership-failure') { res.statusCode = 500; return res.end('{"secret":"private error"}'); }
       if (mode === 'foreign-membership') return res.end(JSON.stringify([{ user_id: owner }]));
@@ -31,6 +36,8 @@ test('administrative requests require verified membership and expected-state wri
       }
       reads.push(url);
       if (mode === 'malformed') return res.end(JSON.stringify([{ ...row, requester_id: 'invalid' }]));
+      if ((url.searchParams.has('id') && url.searchParams.get('id') !== `eq.${id}`) ||
+          (url.searchParams.has('requester_id') && url.searchParams.get('requester_id') !== `eq.${owner}`)) return res.end('[]');
       return res.end(JSON.stringify([row]));
     }
     res.statusCode = 404; res.end('{}');
@@ -82,6 +89,21 @@ test('administrative requests require verified membership and expected-state wri
     const body = await response.json();
     assert.equal(body.id, id); assert.equal(body.status, 'closed');
     assert.equal(row.status, 'closed'); assert.equal(writes.length, count + 1);
+  });
+  await t.test('history is private, scoped to the request and omits internal actor identity', async () => {
+    const own = `${await app.getUrl()}/api/v1/service-requests/${id}/history`;
+    assert.equal((await fetch(own)).status, 401);
+    assert.equal((await fetch(own, { headers: { authorization: 'Bearer stranger-session' } })).status, 404);
+    assert.equal((await fetch(`${base}/${id}/history`, { headers: { authorization: 'Bearer client-session' } })).status, 403);
+    for (const [url, token] of [[own, 'client-session'], [`${base}/${id.toUpperCase()}/history`, 'admin-session']]) {
+      const response = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get('cache-control'), 'no-store');
+      assert.deepEqual((await response.json()).items, [{ id: '44444444-4444-4444-8444-444444444444', fromStatus: 'received', toStatus: 'in_progress', createdAt: '2026-11-01T13:00:00Z' }]);
+    }
+    mode = 'foreign-event';
+    assert.equal((await fetch(own, { headers: { authorization: 'Bearer client-session' } })).status, 503);
+    mode = 'ok';
   });
   await t.test('membership revocation and provider failures fail closed without leaking details', async () => {
     enabled = false;

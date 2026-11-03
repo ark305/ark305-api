@@ -26,4 +26,12 @@ export class RequestAdministrationController {
     const token = accessToken(request);
     return this.requests.transition(token, request.principal!.id, id.toLowerCase(), input.expectedStatus as RequestStatus, input.status as RequestStatus);
   }
+
+  @Get(':id/history')
+  @Header('Cache-Control', 'no-store')
+  async history(@Req() request: AuthenticatedRequest, @Param('id') id: string) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) throw new BadRequestException('Invalid request ID');
+    const token = accessToken(request);
+    return { items: await this.requests.history(token, request.principal!.id, id.toLowerCase(), true) };
+  }
 }

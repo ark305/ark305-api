@@ -1,7 +1,7 @@
-import { ConflictException, ForbiddenException, Injectable, ServiceUnavailableException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { getSupabaseConfig } from '../identity/supabase-config';
-import { CreateServiceRequest, RequestsPort, ServiceRequest } from './requests.port';
-import { RequestStatus } from './request-lifecycle';
+import { CreateServiceRequest, RequestEvent, RequestsPort, ServiceRequest } from './requests.port';
+import { canTransitionRequest, RequestStatus } from './request-lifecycle';
 
 const COLUMNS = 'id,requester_id,service_id,requested_date,guests,preferences,status,created_at';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -39,6 +39,29 @@ function mapRow(value: unknown, ownerId: string): ServiceRequest | null {
 
 @Injectable()
 export class SupabaseRequestsAdapter extends RequestsPort {
+  async history(token: string, viewerId: string, id: string, admin: boolean): Promise<RequestEvent[]> {
+    if (admin) await this.requireAdministrator(token, viewerId);
+    const requests = await this.query(token, { method: 'GET', search: {
+      id: `eq.${id}`, ...(!admin ? { requester_id: `eq.${viewerId}` } : {}), limit: '1',
+    } });
+    if (!Array.isArray(requests) || requests.length > 1) throw new ServiceUnavailableException('Request storage unavailable');
+    if (requests.length === 0) throw new NotFoundException('Service request not found');
+    const owner = admin && isRecord(requests[0]) && typeof requests[0].requester_id === 'string' ? requests[0].requester_id : viewerId;
+    const request = mapRow(requests[0], owner);
+    if (!request || request.id !== id) throw new ServiceUnavailableException('Request storage unavailable');
+    const events = await this.query(token, { method: 'GET', table: 'service_request_events', search: {
+      select: 'id,request_id,from_status,to_status,created_at', request_id: `eq.${id}`, order: 'created_at.asc,id.asc', limit: '50',
+    } });
+    if (!Array.isArray(events) || events.length > 50) throw new ServiceUnavailableException('Request storage unavailable');
+    return events.map(event => {
+      if (!isRecord(event) || typeof event.id !== 'string' || !UUID.test(event.id) || event.request_id !== id ||
+          !canTransitionRequest(event.from_status, event.to_status) || typeof event.created_at !== 'string' || !Number.isFinite(Date.parse(event.created_at))) {
+        throw new ServiceUnavailableException('Request storage unavailable');
+      }
+      return { id: event.id, fromStatus: event.from_status as RequestStatus, toStatus: event.to_status as RequestStatus, createdAt: event.created_at };
+    });
+  }
+
   private async requireAdministrator(token: string, actorId: string): Promise<void> {
     const rows = await this.query(token, {
       method: 'GET', table: 'request_administrators',
@@ -122,7 +145,7 @@ export class SupabaseRequestsAdapter extends RequestsPort {
 
   private async query(
     token: string,
-    options: { method: 'GET' | 'POST' | 'PATCH'; table?: 'request_administrators'; search?: Record<string, string>; headers?: Record<string, string>; body?: string },
+    options: { method: 'GET' | 'POST' | 'PATCH'; table?: 'request_administrators' | 'service_request_events'; search?: Record<string, string>; headers?: Record<string, string>; body?: string },
   ): Promise<unknown> {
     const config = getSupabaseConfig();
     if (!config) throw new ServiceUnavailableException('Request storage unavailable');

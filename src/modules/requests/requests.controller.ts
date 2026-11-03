@@ -81,4 +81,12 @@ export class RequestsController {
     if (!item) throw new NotFoundException('Service request not found');
     return item;
   }
+
+  @Get(':id/history')
+  @Header('Cache-Control', 'no-store')
+  async history(@Req() request: AuthenticatedRequest, @Param('id') id: string) {
+    if (!UUID.test(id)) throw new BadRequestException('Invalid request ID');
+    const token = accessToken(request);
+    return { items: await this.requests.history(token, request.principal!.id, id.toLowerCase(), false) };
+  }
 }

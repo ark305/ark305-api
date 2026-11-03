@@ -17,7 +17,10 @@ export type ServiceRequest = {
   createdAt: string;
 };
 
+export type RequestEvent = { id: string; fromStatus: RequestStatus; toStatus: RequestStatus; createdAt: string };
+
 export abstract class RequestsPort {
+  abstract history(token: string, viewerId: string, id: string, admin: boolean): Promise<RequestEvent[]>;
   abstract listAdmin(token: string, actorId: string): Promise<Array<ServiceRequest & { requesterId: string }>>;
   abstract transition(token: string, actorId: string, id: string, expectedStatus: RequestStatus, status: RequestStatus): Promise<ServiceRequest>;
   abstract create(token: string, ownerId: string, request: CreateServiceRequest): Promise<ServiceRequest>;
