@@ -6,7 +6,7 @@ const { createApp } = require('../dist/app');
 test('administrative requests require verified membership and expected-state writes', async t => {
   const admin = '55555555-5555-4555-8555-555555555555';
   const owner = '11111111-1111-4111-8111-111111111111';
-  const id = '22222222-2222-4222-8222-222222222222';
+  const id = 'a2222222-2222-4222-8222-22222222222b';
   let row = { id, requester_id: owner, service_id: 'yacht', requested_date: '2027-01-15', guests: 4, preferences: '', status: 'received', created_at: '2026-11-01T12:00:00Z' };
   let enabled = true; let mode = 'ok'; const writes = []; const reads = [];
   const saved = { SUPABASE_URL: process.env.SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY: process.env.SUPABASE_PUBLISHABLE_KEY };
@@ -25,7 +25,7 @@ test('administrative requests require verified membership and expected-state wri
         let body = ''; for await (const part of req) body += part;
         const input = JSON.parse(body); writes.push({ input, url, bearer: req.headers.authorization });
         if (mode === 'write-failure') { res.statusCode = 500; return res.end('{"secret":"private error"}'); }
-        if (url.searchParams.get('id') !== `eq.${id}` || url.searchParams.get('status') !== `eq.${row.status}`) return res.end('[]');
+        if (url.searchParams.get('id')?.toLowerCase() !== `eq.${id}` || url.searchParams.get('status') !== `eq.${row.status}`) return res.end('[]');
         row = { ...row, ...input };
         return res.end(JSON.stringify([row]));
       }
@@ -74,6 +74,14 @@ test('administrative requests require verified membership and expected-state wri
     }
     assert.equal((await patch(change, headers, 'not-a-uuid')).status, 400);
     assert.equal(writes.length, before);
+  });
+  await t.test('uppercase request UUID returns canonical success after exactly one write', async () => {
+    const count = writes.length;
+    const response = await patch({ expectedStatus: 'in_progress', status: 'closed' }, headers, id.toUpperCase());
+    assert.equal(response.status, 200);
+    const body = await response.json();
+    assert.equal(body.id, id); assert.equal(body.status, 'closed');
+    assert.equal(row.status, 'closed'); assert.equal(writes.length, count + 1);
   });
   await t.test('membership revocation and provider failures fail closed without leaking details', async () => {
     enabled = false;

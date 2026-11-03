@@ -24,6 +24,6 @@ export class RequestAdministrationController {
     if (Object.keys(input).some(key => !['expectedStatus', 'status'].includes(key)) ||
         !canTransitionRequest(input.expectedStatus, input.status)) throw new BadRequestException('Invalid request transition');
     const token = accessToken(request);
-    return this.requests.transition(token, request.principal!.id, id, input.expectedStatus as RequestStatus, input.status as RequestStatus);
+    return this.requests.transition(token, request.principal!.id, id.toLowerCase(), input.expectedStatus as RequestStatus, input.status as RequestStatus);
   }
 }
