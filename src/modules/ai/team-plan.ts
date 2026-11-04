@@ -34,7 +34,7 @@ export function parseTeamPlan(value: unknown) {
     const p = TEAM_CATALOG.find(p => p.id === line.id);
     if (!p || items.some(item => item.id === p.id)) return null;
     const periods = p.unit === 'h' ? ['monthly', 'one_off'] : p.unit === 'm' ? ['monthly'] : p.unit === 'q' ? ['quote'] : ['one_off'];
-    if (!periods.includes(String(line.cadence)) || (p.unit === 'h' ? line.hours < 1 || line.hours > 40 : line.hours !== 0)) return null;
+    if (typeof line.cadence !== 'string' || !periods.includes(line.cadence) || (p.unit === 'h' ? line.hours < 1 || line.hours > 40 : line.hours !== 0)) return null;
     const amount = p.unit === 'q' ? null : Math.round(p.rate * (p.unit === 'h' ? line.hours * (line.cadence === 'monthly' ? 4.33 : 1) : 1));
     items.push({ id: p.id, hours: line.hours, cadence: line.cadence as Cadence, amount });
   }

@@ -2,6 +2,20 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { parseTeamPlan, TEAM_SCHEMA } = require('../dist/modules/ai/team-plan');
 
+test('team cadence must be a primitive string, never a coerced JSON value', () => {
+  for (const item of [
+    { id: 'r-cm', hours: 10, cadence: 'monthly' },
+    { id: 'turn', hours: 0, cadence: 'one_off' },
+    { id: 'kitchen', hours: 0, cadence: 'quote' },
+  ]) {
+    const plan = { understood: true, rationale: 'Propuesta.', items: [item] };
+    assert.ok(parseTeamPlan(plan));
+    for (const cadence of [[item.cadence], [[item.cadence]], null, {}, true, 1]) {
+      assert.equal(parseTeamPlan({ ...plan, items: [{ ...item, cadence }] }), null, JSON.stringify(cadence));
+    }
+  }
+});
+
 test('team estimates separate recurring, one-off and quote-only costs', () => {
   const plan = parseTeamPlan({ understood: true, rationale: 'Equipo y servicios para tu negocio.', items: [
     { id: 'r-cm', hours: 10, cadence: 'monthly' },
