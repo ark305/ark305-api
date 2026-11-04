@@ -5,12 +5,13 @@ import { createApp } from '../dist/application.js';
 
 test('Nest structured AI preserves day-plan and diagnosis contracts', async (t) => {
   const owner = '11111111-1111-4111-8111-111111111111';
-  const keys = ['SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY', 'META_API_KEY', 'META_BASE_URL', 'AI_DAILY_LIMIT', 'TEAM_PROPOSAL_SIGNING_KEY'];
+  const keys = ['SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY', 'MODEL_API_KEY', 'META_BASE_URL', 'AI_DAILY_LIMIT', 'TEAM_PROPOSAL_SIGNING_KEY'];
   const saved = Object.fromEntries(keys.map(key => [key, process.env[key]]));
   const calls = [];
   let quotaStatus = 200;
   let quotaValue = true;
   let providerPayload;
+  let toolQuery = 'all';
   let storedProposals = [], storageFails = false;
   const provider = createServer(async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
@@ -31,7 +32,10 @@ test('Nest structured AI preserves day-plan and diagnosis contracts', async (t) 
       assert.equal(new URL(req.url, 'http://local').searchParams.get('owner'), `eq.${owner}`);
       return res.end(JSON.stringify([{ id: '22222222-2222-4222-8222-222222222222', owner, title: 'Editing', price: 150 }]));
     }
-    if (req.url === '/v1/messages') return res.end(JSON.stringify(providerPayload));
+    if (req.url === '/v1/messages') {
+      if (body.tool_choice?.type === 'auto') return res.end(JSON.stringify({ stop_reason:'tool_use',content:[{type:'tool_use',id:'call_catalog',name:body.tools[0].name,input:body.tools[0].name === 'get_complements' ? {serviceId:'yacht'} : {query:toolQuery}}] }));
+      return res.end(JSON.stringify(providerPayload));
+    }
     res.statusCode = 404; res.end('{}');
   });
   await new Promise(resolve => provider.listen(0, '127.0.0.1', resolve));
@@ -42,7 +46,7 @@ test('Nest structured AI preserves day-plan and diagnosis contracts', async (t) 
     if (target.origin === 'https://api.meta.ai') return realFetch(new URL(target.pathname + target.search, providerUrl), init);
     return realFetch(input, init);
   };
-  Object.assign(process.env, { SUPABASE_URL: providerUrl, SUPABASE_PUBLISHABLE_KEY: 'public-test', META_API_KEY: 'meta-test', META_BASE_URL: 'https://api.meta.ai', AI_DAILY_LIMIT: '7' });
+  Object.assign(process.env, { SUPABASE_URL: providerUrl, SUPABASE_PUBLISHABLE_KEY: 'public-test', MODEL_API_KEY: 'meta-test', META_BASE_URL: 'https://api.meta.ai', AI_DAILY_LIMIT: '7' });
   process.env.TEAM_PROPOSAL_SIGNING_KEY = 'local-test-signing-key-not-a-secret-123456';
   const app = await createApp(); await app.listen(0, '127.0.0.1');
   t.after(async () => {
@@ -128,12 +132,35 @@ test('Nest structured AI preserves day-plan and diagnosis contracts', async (t) 
     providerPayload = { stop_reason: 'end_turn', model: 'muse-test', id: 'msg-day', content: [{ type: 'text', text: JSON.stringify({ guests: 2, understood: true, items: [{ id: 'yacht', time: '11:00', qty: 4 }] }) }] };
     const response = await send({ task: 'day-plan', prompt: 'yacht for 3 people', guests: 3, locale: 'en' });
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { plan: { guests: 2, understood: true, items: [{ id: 'yacht', time: '11:00', qty: 4, guests: 2 }] }, provenance: { provider: 'Meta', model: 'muse-test', responseId: 'msg-day' } });
+    const result = await response.json();
+    assert.equal(result.tools[0].name, 'search_catalog');
+    const { tools, ...legacy } = result;
+    assert.deepEqual(legacy, { plan: { guests: 2, understood: true, items: [{ id: 'yacht', time: '11:00', qty: 4, guests: 2 }] }, provenance: { provider: 'Meta', model: 'muse-test', responseId: 'msg-day' } });
     const request = metaCalls().at(-1).body;
     assert.equal(request.max_tokens, 4096);
     assert.equal(request.output_config.format.type, 'json_schema');
-    assert.match(request.system, /Use only this catalog/);
+    assert.match(request.system, /must use the catalog tool/);
     assert.match(request.system, /both mode/);
+  });
+
+  await t.test('catalog grounding rejects unseen IDs, handles no matches and proposes optional upsell in both locales', async () => {
+    for (const locale of ['es', 'en']) {
+      toolQuery = 'submarine-to-mars';
+      const body = {task:'day-plan',prompt:'submarine-to-mars',guests:4,locale};
+      providerPayload = {stop_reason:'end_turn',model:'muse-test',id:'msg-empty',content:[{type:'text',text:JSON.stringify({guests:4,understood:false,items:[]})}]};
+      let response = await send(body); assert.equal(response.status,200);
+      let data = await response.json(); assert.deepEqual(data.plan.items,[]); assert.deepEqual(data.tools[0].serviceIds,[]);
+      providerPayload.content[0].text=JSON.stringify({guests:4,understood:true,items:[{id:'yacht',time:'12:00',qty:1}]});
+      response=await send(body); assert.equal(response.status,502);
+      const before=metaCalls().length;
+      assert.equal((await send({...body,task:'day-upsell',serviceId:'nonexistent'})).status,400);
+      assert.equal(metaCalls().length,before);
+      providerPayload.content[0].text=JSON.stringify({guests:4,understood:true,items:[{id:'bottles',time:'12:00',qty:1}]});
+      response=await send({...body,task:'day-upsell',serviceId:'yacht',prompt:'Optional complement'});
+      assert.equal(response.status,200);data=await response.json();assert.equal(data.tools[0].name,'get_complements');assert.equal(data.plan.items[0].id,'bottles');
+      assert.equal(calls.filter(c=>c.path.startsWith('/rest/v1/service_requests') && c.body).length,0,'model cannot submit a request');
+    }
+    toolQuery='all';
   });
 
   await t.test('day-plan schema constrains quantities by catalog unit', async () => {

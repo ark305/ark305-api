@@ -5,7 +5,7 @@ import { createApp } from '../dist/application.js';
 
 test('Nest conversation preserves identity, quota and the generic AI contract', async (t) => {
   const owner = '11111111-1111-4111-8111-111111111111';
-  const keys = ['SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY', 'META_API_KEY', 'META_BASE_URL', 'META_MODEL', 'META_MODEL_QUICK'];
+  const keys = ['SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY', 'MODEL_API_KEY', 'META_BASE_URL', 'META_MODEL', 'META_MODEL_QUICK'];
   const saved = Object.fromEntries(keys.map(key => [key, process.env[key]]));
   const calls = [];
   let allowed = true;
@@ -25,7 +25,7 @@ test('Nest conversation preserves identity, quota and the generic AI contract', 
   });
   await new Promise(resolve => provider.listen(0, '127.0.0.1', resolve));
   const providerUrl = `http://127.0.0.1:${provider.address().port}`;
-  Object.assign(process.env, { SUPABASE_URL: providerUrl, SUPABASE_PUBLISHABLE_KEY: 'test-public', META_API_KEY: 'test-meta', META_BASE_URL: providerUrl, META_MODEL: 'test-default', META_MODEL_QUICK: 'test-quick' });
+  Object.assign(process.env, { SUPABASE_URL: providerUrl, SUPABASE_PUBLISHABLE_KEY: 'test-public', MODEL_API_KEY: 'test-meta', META_BASE_URL: providerUrl, META_MODEL: 'test-default', META_MODEL_QUICK: 'test-quick' });
   const app = await createApp(); await app.listen(0, '127.0.0.1');
   t.after(async () => {
     await app.close(); provider.closeAllConnections(); await new Promise(resolve => provider.close(resolve));

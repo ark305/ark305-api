@@ -1,6 +1,8 @@
 import { HttpException, Injectable } from '@nestjs/common';
 import { AiContextAdapter } from './ai-context.adapter.js';
 import { MetaAdapter } from './meta.adapter.js';
+import { CatalogPort } from '../catalog/catalog.port.js';
+import { catalogTools, queryCatalog } from './catalog-tools.js';
 import { SYSTEM } from './system-prompts.js';
 import { SellerDraftService } from './seller-draft.js';
 import { TeamProposalsService } from '../team-proposals/team-proposals.service.js';
@@ -10,14 +12,16 @@ import { DAY_PLAN_SCHEMA, diagnosisOutputIssue, diagnosisPrompt, diagnosisSchema
 
 @Injectable()
 export class AiService {
-  constructor(private readonly context: AiContextAdapter, private readonly meta: MetaAdapter, private readonly seller: SellerDraftService, private readonly proposals: TeamProposalsService) {}
+  constructor(private readonly context: AiContextAdapter, private readonly meta: MetaAdapter, private readonly seller: SellerDraftService, private readonly proposals: TeamProposalsService, private readonly catalog: CatalogPort) {}
 
   async generate(input: unknown, token: string, userId: string) {
     this.meta.configuration();
     if (!input || typeof input !== 'object' || Array.isArray(input)) throw new HttpException({ error: 'prompt' }, 400);
     const body = input as Record<string, unknown>;
     if (body.task === 'seller-draft') return this.seller.generate(body, token, userId);
-    const dayPlan = body.task === 'day-plan';
+    const upsell = body.task === 'day-upsell';
+    const dayPlan = body.task === 'day-plan' || upsell;
+    if (upsell && (typeof body.serviceId !== 'string' || !await this.catalog.findById(body.serviceId))) throw new HttpException({ error: 'service_not_found' }, 400);
     const diagnosis = body.task === 'diagnosis';
     const teamPlan = body.task === 'team-plan';
     if (teamPlan && !validTeamInput(body)) throw new HttpException({ error: 'prompt' }, 400);
@@ -71,8 +75,22 @@ Catalog prices are DEMO estimates, not quotes. Do not invent prices, candidates,
     }
     if (dayPlan) {
       const prompt = typeof body.prompt === 'string' ? body.prompt : '';
-      const system = `${locale === 'en' ? SYSTEM.en : SYSTEM.es}${mode}\nReturn a day plan matching the supplied JSON schema. Use only this catalog: ${JSON.stringify(SERVICES_FOR_PROMPT(locale))}\nNever invent service IDs, prices, confirmed providers or availability. Use each ID at most once. For unrelated requests or when no service fits, return understood=false and items=[]. Otherwise understood=true. Guests must be 1-20; quantity is hours for hourly services and 1 for other units. Times are local HH:MM.\nRequested guests: ${body.guests}.`;
-      const data = await this.meta.structured(system, [{ role: 'user', content: prompt }], DAY_PLAN_SCHEMA, 4096, false, body.tier === 'quick');
+      const baseId = upsell ? body.serviceId as string : undefined;
+      const system = `${locale === 'en' ? SYSTEM.en : SYSTEM.es}${mode}
+Respond in ${locale}. You must use the catalog tool before planning. Do not use remembered inventory.
+Only recommend IDs returned by the tool. The catalog is DEMO, with unverified availability and non-binding prototype estimates; never confirm a booking, price quote or supplier.
+Return the supplied plan schema after reading the tool result. No matching service: understood=false, items=[]; never substitute a different service for a nonexistent request.
+Use each ID once. Hours for hourly services, quantity1 for other units. Local HH:MM times.
+${upsell ? `Suggest at most ONE optional compatible complement for service ${baseId}; quantity must be1. Do not accept or submit anything. No suitable complement: empty plan.` : ''}
+Requested guests: ${body.guests}.`;
+      const { data, evidence } = await this.meta.catalogPlan(system, prompt, DAY_PLAN_SCHEMA, catalogTools(baseId),
+        (name, input) => queryCatalog(this.catalog, name, input, locale, baseId), body.tier === 'quick');
+      const tools = evidence.map(item => {
+        const result = item.result as Awaited<ReturnType<typeof queryCatalog>>;
+        return { name: item.name, callId: item.callId, arguments: item.input,
+          serviceIds: result.services.map(service => service.id), source: result.source, availability: result.availability };
+      });
+      const allowed = new Set(tools.flatMap(tool => tool.serviceIds));
       if (data.stop_reason === 'max_tokens') throw new HttpException({ error: 'invalid_plan', reason: 'truncated' }, 502);
       if (data.stop_reason !== 'end_turn' || typeof data.model !== 'string' || !data.model || typeof data.id !== 'string' || !data.id || !Array.isArray(data.content)) {
         throw new HttpException({ error: 'invalid_plan', reason: 'invalid_metadata' }, 502);
@@ -81,19 +99,14 @@ Catalog prices are DEMO estimates, not quotes. Do not invent prices, candidates,
       try { output = JSON.parse(extractText(data.content)); }
       catch { throw new HttpException({ error: 'invalid_plan', reason: 'invalid_json' }, 502); }
       const plan = parseDayPlan(output);
-      if (!plan) throw new HttpException({ error: 'invalid_plan', reason: 'invalid_items' }, 502);
-      return { plan, provenance: { provider: 'Meta', model: data.model, responseId: data.id } };
+      if (!plan || plan.items.some(item => !allowed.has(item.id)) || (upsell && (plan.items.length > 1 || plan.items.some(item => item.qty !== 1)))) throw new HttpException({ error: 'invalid_plan', reason: 'invalid_items' }, 502);
+      return { plan, tools, provenance: { provider: 'Meta', model: data.model, responseId: data.id } };
     }
     const prompt = String(body.prompt || '').slice(0, 60000);
     if (!prompt) throw new HttpException({ error: 'prompt' }, 400);
     const system = SYSTEM[locale] + mode + (body.json ? ' Respond ONLY with valid JSON, no extra text or code blocks.' : '');
     return { text: await this.meta.text(system, prompt, body.tier === 'quick'), user: userId };
   }
-}
-
-import { SERVICES } from './service-catalog.js';
-function SERVICES_FOR_PROMPT(locale: 'es' | 'en') {
-  return SERVICES.map(({ id, name, description, unit }) => ({ id, name: name[locale], description: description[locale], unit }));
 }
 
 function extractText(content: unknown[]): string {
