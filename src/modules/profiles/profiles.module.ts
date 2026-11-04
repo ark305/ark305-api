@@ -6,5 +6,6 @@ import { SupabaseProfilesAdapter } from './supabase-profiles.adapter';
 @Module({
   controllers: [ProfilesController],
   providers: [{ provide: ProfilesPort, useClass: SupabaseProfilesAdapter }],
+  exports: [ProfilesPort],
 })
 export class ProfilesModule {}

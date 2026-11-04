@@ -20,7 +20,11 @@ test('Nest structured AI preserves day-plan and diagnosis contracts', async (t) 
     if (req.url === '/rest/v1/rpc/bump_ai') {
       res.statusCode = quotaStatus; return res.end(JSON.stringify(quotaValue));
     }
-    if (req.url.startsWith('/rest/v1/profiles?')) return res.end(JSON.stringify([{ experience: 'both' }]));
+    if (req.url.startsWith('/rest/v1/profiles?')) return res.end(JSON.stringify([{ id: owner, name: 'Owner business', handle: 'owner', experience: 'both' }]));
+    if (req.url.startsWith('/rest/v1/services?')) {
+      assert.equal(new URL(req.url, 'http://local').searchParams.get('owner'), `eq.${owner}`);
+      return res.end(JSON.stringify([{ id: '22222222-2222-4222-8222-222222222222', owner, title: 'Editing', price: 150 }]));
+    }
     if (req.url === '/v1/messages') return res.end(JSON.stringify(providerPayload));
     res.statusCode = 404; res.end('{}');
   });
@@ -42,6 +46,21 @@ test('Nest structured AI preserves day-plan and diagnosis contracts', async (t) 
   const url = `${await app.getUrl()}/api/v1/ai`;
   const send = (body, token = 'user-token') => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) });
   const metaCalls = () => calls.filter(call => call.path === '/v1/messages');
+  await t.test('seller-draft public endpoint enforces ownership, quota and deterministic price', async () => {
+    const body = { task: 'seller-draft', action: 'price', locale: 'es', tone: 'business', serviceId: '22222222-2222-4222-8222-222222222222', cost: 75, marginPercent: 25 };
+    let before = metaCalls().length;
+    assert.equal((await send(body, '')).status, 401);
+    assert.equal((await send({ ...body, serviceId: '33333333-3333-4333-8333-333333333333' })).status, 404);
+    assert.equal((await send({ ...body, owner: 'spoof' })).status, 400);
+    assert.equal(metaCalls().length, before);
+    providerPayload = { stop_reason: 'end_turn', model: 'muse-test', id: 'msg-seller', content: [{ type: 'text', text: '{"text":"Borrador para revisar."}' }] };
+    const response = await send(body); assert.equal(response.status, 200);
+    const result = await response.json(); assert.equal(result.pricing.suggestedPrice, 100); assert.equal(result.provenance.responseId, 'msg-seller');
+    const facts = JSON.parse(metaCalls().at(-1).body.messages[0].content);
+    assert.equal(facts.service.title, 'Editing'); assert.equal(facts.name, 'Owner business');
+    before = metaCalls().length; quotaStatus = 503;
+    assert.equal((await send(body)).status, 503); assert.equal(metaCalls().length, before); quotaStatus = 200;
+  });
   await t.test('team-plan uses strict quota, server prices and real provider metadata', async () => {
     const body = { task: 'team-plan', prompt: 'Un community manager y una limpieza puntual.', locale: 'es' };
     const before = calls.length;

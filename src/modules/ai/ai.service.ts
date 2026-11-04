@@ -2,18 +2,20 @@ import { HttpException, Injectable } from '@nestjs/common';
 import { AiContextAdapter } from './ai-context.adapter';
 import { MetaAdapter } from './meta.adapter';
 import { SYSTEM } from './system-prompts';
+import { SellerDraftService } from './seller-draft';
 import { TEAM_CATALOG } from './team-catalog';
 import { parseTeamPlan, TEAM_SCHEMA, validTeamInput } from './team-plan';
 import { DAY_PLAN_SCHEMA, diagnosisOutputIssue, diagnosisPrompt, diagnosisSchema, formatDiagnosis, parseDayPlan, parseDiagnosisInput } from './structured-ai';
 
 @Injectable()
 export class AiService {
-  constructor(private readonly context: AiContextAdapter, private readonly meta: MetaAdapter) {}
+  constructor(private readonly context: AiContextAdapter, private readonly meta: MetaAdapter, private readonly seller: SellerDraftService) {}
 
   async generate(input: unknown, token: string, userId: string) {
     this.meta.configuration();
     if (!input || typeof input !== 'object' || Array.isArray(input)) throw new HttpException({ error: 'prompt' }, 400);
     const body = input as Record<string, unknown>;
+    if (body.task === 'seller-draft') return this.seller.generate(body, token, userId);
     const dayPlan = body.task === 'day-plan';
     const diagnosis = body.task === 'diagnosis';
     const teamPlan = body.task === 'team-plan';
