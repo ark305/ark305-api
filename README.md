@@ -1,4 +1,4 @@
-# API de ARK305.
+# API de ARK305
 
 Backend NestJS independiente para la web y futuros clientes móviles. Este paquete no requiere archivos ni dependencias del repositorio web `ark305`.
 
