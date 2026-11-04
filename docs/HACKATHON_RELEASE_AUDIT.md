@@ -7,7 +7,7 @@
 | Control | Resultado observado | Falta antes de publicar |
 | --- | --- | --- |
 | Tres flujos del MVP | Recorridos ES y EN en navegador, con solicitudes y complementos persistidos | Probar el despliegue final en incógnito |
-| Revisión de código | Candidatos completos y unidades API B1/B2 aprobados y reconocidos; sin bloqueadores | Dos advertencias no bloqueantes de API detalladas abajo; evaluar nuevos cambios ejecutables antes de entregar |
+| Revisión de código | Cuatro commits funcionales/documentales aprobados y reconocidos; sin bloqueadores | Dos advertencias no bloqueantes de API detalladas abajo; evaluar nuevos cambios ejecutables antes de entregar |
 | Secretos | Sin candidatos confirmados en archivos versionados ni en los parches históricos revisados | Revisión final del diff y herramientas de secret scanning del anfitrión |
 | Marca restringida | Sin coincidencias textuales con los nombres y variantes de la marca de terceros en los dos repositorios ni en sus parches históricos | Inspección visual de imágenes, video y metadatos antes de hacerlos públicos |
 | Licencia | ARK305 autorizó MIT para ambos repositorios; los archivos `LICENSE` y los avisos README están preparados localmente | Confirmar que los archivos figuran en los commits definitivos |
@@ -31,10 +31,10 @@ Los cambios siguen sin push. La estrategia elegida es una cadena de rama funcion
 | --- | --- | --- |
 | API | `82bc223` · `feat(ai): consult Meta catalog tools` | Adaptador de herramientas, validación de resultados, `MODEL_API_KEY`, pruebas y documentación del contrato |
 | API | `94564f6` · `feat(requests): persist accepted add-ons` | Servicio y controlador de complementos, migración SQL, pruebas de permisos y concurrencia |
-| API | Pendiente · `docs: document hackathon delivery gates` | Proceso, auditoría, guion y registro de tareas |
-| Web | Pendiente · `feat(concierge): show catalog evidence and accepted add-ons` | Evidencia de herramientas, aceptación desde solicitudes, textos ES/EN y pruebas de interfaz |
+| API | `3f984e2` · `docs: prepare hackathon release` | Proceso, auditoría, guion y registro de tareas |
+| Web | `546591e` · `feat(concierge): show catalog evidence and accepted add-ons` | Evidencia de herramientas, aceptación desde solicitudes, textos ES/EN, pruebas de interfaz y licencia MIT |
 
-Los dos primeros commits existen solo en el repositorio API local; los demás nombres son propuestas. No se debe publicar el historial hasta cerrar la revisión final y obtener autorización específica.
+Los cuatro commits existen solo en los repositorios locales; se añadirá una unidad documental de cierre para registrar sus identidades. No se debe publicar el historial hasta obtener autorización específica.
 
 ## Advertencias no bloqueantes de revisión
 
