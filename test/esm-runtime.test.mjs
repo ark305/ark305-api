@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 test('API boots and preserves HTTP contracts without require(esm) support', () => {
   const probe = `
     import assert from 'node:assert/strict';
-    import { createApp } from './dist/app.js';
+    import { createApp } from './dist/application.js';
     const app = await createApp();
     try {
       await app.listen(0, '127.0.0.1');

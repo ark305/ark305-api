@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { createApp } from '../dist/app.js';
+import { createApp } from '../dist/application.js';
 
 test('Nest validates identity without trusting client claims', async (t) => {
   const original = { url: process.env.SUPABASE_URL, key: process.env.SUPABASE_PUBLISHABLE_KEY };

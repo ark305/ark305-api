@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { createApp } from '../dist/app.js';
+import { createApp } from '../dist/application.js';
 
 test('API exposes versioned health without external services', async (t) => {
   const app = await createApp();

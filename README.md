@@ -48,6 +48,8 @@ Las pruebas de aplicación están en `test/*.test.mjs`. `npm test` desactiva la 
 
 Para desplegar, utilizar la raíz de este repositorio y la entrada `src/main.ts`. Configurar las variables privadas del backend en Vercel; `.env.vercel` es un archivo local de preparación, no una configuración que se publique automáticamente. Después de desplegar, comprobar `GET /api/v1/health`: debe responder `200` con `{"status":"ok","service":"ark305-api"}`. `/health` no es la ruta del API.
 
+La fábrica reutilizable está en `src/application.ts`, no en `src/app.ts`. El detector específico de NestJS busca nombres de entrada e imports directos de `@nestjs/core`; `src/main.ts` conserva ese import para que Vercel seleccione el archivo que ejecuta `listen()`, no una fábrica sin servidor. La prueba `test/entrypoint.test.mjs` reproduce esa selección y arranca `dist/main.js` para comprobar salud y protección de rutas. La selección se basa en el [detector oficial de NestJS](https://github.com/vercel/vercel/blob/main/packages/nestjs/src/build.ts); no sustituye una prueba del despliegue remoto.
+
 La prueba local de ESM no sustituye la comprobación del despliegue real. Referencias: [NestJS en Vercel](https://vercel.com/docs/frameworks/backend/nestjs) y [migración de NestJS](https://docs.nestjs.com/migration-guide).
 
 La prueba opcional `npm run test:rls` requiere Docker local y la imagen `postgres:17` ya instalada. Crea y elimina únicamente su contenedor aislado, sin red ni puertos publicados. No descarga imágenes ni modifica Supabase remoto.

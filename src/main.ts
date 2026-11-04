@@ -1,4 +1,6 @@
-import { createApp } from './app.js';
+// Vercel detects NestJS entrypoints through a direct framework import.
+import '@nestjs/core';
+import { createApp } from './application.js';
 
 async function bootstrap() {
   const port = Number(process.env.PORT ?? 3001);
