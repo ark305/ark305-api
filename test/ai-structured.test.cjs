@@ -60,10 +60,43 @@ test('Nest structured AI preserves day-plan and diagnosis contracts', async (t) 
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), { plan: { guests: 2, understood: true, items: [{ id: 'yacht', time: '11:00', qty: 4, guests: 2 }] }, provenance: { provider: 'Meta', model: 'muse-test', responseId: 'msg-day' } });
     const request = metaCalls().at(-1).body;
-    assert.equal(request.max_tokens, 1500);
+    assert.equal(request.max_tokens, 4096);
     assert.equal(request.output_config.format.type, 'json_schema');
     assert.match(request.system, /Use only this catalog/);
     assert.match(request.system, /both mode/);
+  });
+
+  await t.test('day-plan schema constrains quantities by catalog unit', async () => {
+    const { SERVICES } = require('../dist/modules/ai/service-catalog');
+    const { parseDayPlan } = require('../dist/modules/ai/structured-ai');
+    const schema = metaCalls().at(-1).body.output_config.format.schema;
+    for (const service of SERVICES) {
+      for (const qty of [1, 6, 12]) {
+        const item = { id: service.id, time: '20:00', qty };
+        const expected = service.unit === 'h' || qty === 1;
+        assert.equal(schemaAccepts(schema.properties.items.items, item), expected, `${service.id}/${qty}`);
+        assert.equal(parseDayPlan({ guests: 6, understood: true, items: [item] }) !== null, expected);
+      }
+    }
+  });
+
+  await t.test('day-plan failures expose only fixed reasons without raw model output', async () => {
+    const base = { stop_reason: 'end_turn', model: 'muse-test', id: 'msg-plan', content: [] };
+    for (const [payload, reason] of [
+      [{ ...base, stop_reason: 'max_tokens' }, 'truncated'],
+      [{ ...base, model: '' }, 'invalid_metadata'],
+      [{ ...base, content: [{ type: 'text', text: 'private model output' }] }, 'invalid_json'],
+      [{ ...base, content: [{ type: 'text', text: JSON.stringify({ guests: 6, understood: true, items: [{ id: 'restaurant', time: '20:00', qty: 6 }] }) }] }, 'invalid_items'],
+    ]) {
+      providerPayload = payload;
+      const response = await send({ task: 'day-plan', prompt: 'private user request', guests: 6 });
+      assert.equal(response.status, 502);
+      assert.deepEqual(await response.json(), { error: 'invalid_plan', reason });
+    }
+    providerPayload = { ...base, content: [{ type: 'text', text: JSON.stringify({ guests: 6, understood: true, items: [{ id: 'restaurant', time: '20:00', qty: 1 }] }) }] };
+    const valid = await send({ task: 'day-plan', prompt: 'dinner for 6', guests: 6 });
+    assert.equal(valid.status, 200);
+    assert.equal((await valid.json()).plan.items[0].guests, 6);
   });
 
   await t.test('valid diagnosis applies an answer patch and returns provenance', async () => {
@@ -105,7 +138,7 @@ test('Nest structured AI preserves day-plan and diagnosis contracts', async (t) 
   await t.test('invalid model output does not claim verified provenance', async () => {
     providerPayload = { stop_reason: 'end_turn', model: 'muse-test', id: 'bad-plan', content: [{ type: 'text', text: JSON.stringify({ guests: 3, understood: true, items: [{ id: 'unknown', time: '11:00', qty: 1 }] }) }] };
     const response = await send({ task: 'day-plan', prompt: 'something', guests: 3 });
-    assert.equal(response.status, 502); assert.deepEqual(await response.json(), { error: 'invalid_plan' });
+    assert.equal(response.status, 502); assert.deepEqual(await response.json(), { error: 'invalid_plan', reason: 'invalid_items' });
   });
 
   await t.test('structured tasks reject a non-Meta origin before quota or provider access', async () => {
@@ -160,6 +193,26 @@ test('Nest structured AI preserves day-plan and diagnosis contracts', async (t) 
     assert.doesNotMatch(JSON.stringify(logs), /secret-user-value|Private reply/);
     const firstPrompt = metaCalls().find(call => call.body.messages.at(-1).content === 'Private input').body.system;
     assert.match(firstPrompt, /Available flows:/); assert.match(firstPrompt, /"group"/); assert.match(firstPrompt, /"couple"/); assert.match(firstPrompt, /"residency"/);
+  });
+
+  await t.test('diagnosis preserves printable Unicode and rejects corrupt control characters', async () => {
+    const { diagnosisSchema } = require('../dist/modules/ai/structured-ai');
+    const schema = diagnosisSchema({});
+    const valid = ['?Desde qu? pa?s trabajar?as? ?Tambi?n en remoto! ?and?, ping?ino.', 'Primera l?nea' + String.fromCharCode(10) + 'Segunda l?nea' + String.fromCharCode(9) + '??'];
+    for (const reply of valid) {
+      assert.equal(schemaAccepts(schema, { reply, answers: {} }), true);
+      providerPayload = { stop_reason: 'end_turn', model: 'muse-test', id: 'msg-unicode', content: [{ type: 'text', text: JSON.stringify({ reply, answers: {} }) }] };
+      const response = await send({ task: 'diagnosis', message: 'Hola', answers: {}, conversation: [], locale: 'es' });
+      assert.equal(response.status, 200);
+      assert.equal((await response.json()).reply, reply);
+    }
+    for (const reply of ['\u0000100Desde qu? pa?s', 'Pa\u00117?s', 'Texto\u007f', 'Texto\u0085', 'Pa\ufffds']) {
+      assert.equal(schemaAccepts(schema, { reply, answers: {} }), false);
+      providerPayload = { stop_reason: 'end_turn', model: 'muse-test', id: 'msg-corrupt', content: [{ type: 'text', text: JSON.stringify({ reply, answers: {} }) }] };
+      const response = await send({ task: 'diagnosis', message: 'Hola', answers: {}, conversation: [], locale: 'es' });
+      assert.equal(response.status, 502);
+      assert.deepEqual(await response.json(), { error: 'invalid_diagnosis', reason: 'invalid_answers' });
+    }
   });
 
   await t.test('diagnosis bounds malformed content, truncation and metadata without returning model text', async () => {

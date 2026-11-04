@@ -42,13 +42,17 @@ export class AiService {
     if (dayPlan) {
       const prompt = typeof body.prompt === 'string' ? body.prompt : '';
       const system = `${locale === 'en' ? SYSTEM.en : SYSTEM.es}${mode}\nReturn a day plan matching the supplied JSON schema. Use only this catalog: ${JSON.stringify(SERVICES_FOR_PROMPT(locale))}\nNever invent service IDs, prices, confirmed providers or availability. Use each ID at most once. For unrelated requests or when no service fits, return understood=false and items=[]. Otherwise understood=true. Guests must be 1-20; quantity is hours for hourly services and 1 for other units. Times are local HH:MM.\nRequested guests: ${body.guests}.`;
-      const data = await this.meta.structured(system, [{ role: 'user', content: prompt }], DAY_PLAN_SCHEMA, 1500, false, body.tier === 'quick');
-      if (data.stop_reason !== 'end_turn' || typeof data.model !== 'string' || !data.model || typeof data.id !== 'string' || !data.id || !Array.isArray(data.content)) throw new HttpException({ error: 'invalid_plan' }, 502);
-      try {
-        const plan = parseDayPlan(JSON.parse(extractText(data.content)));
-        if (!plan) throw new Error();
-        return { plan, provenance: { provider: 'Meta', model: data.model, responseId: data.id } };
-      } catch { throw new HttpException({ error: 'invalid_plan' }, 502); }
+      const data = await this.meta.structured(system, [{ role: 'user', content: prompt }], DAY_PLAN_SCHEMA, 4096, false, body.tier === 'quick');
+      if (data.stop_reason === 'max_tokens') throw new HttpException({ error: 'invalid_plan', reason: 'truncated' }, 502);
+      if (data.stop_reason !== 'end_turn' || typeof data.model !== 'string' || !data.model || typeof data.id !== 'string' || !data.id || !Array.isArray(data.content)) {
+        throw new HttpException({ error: 'invalid_plan', reason: 'invalid_metadata' }, 502);
+      }
+      let output: unknown;
+      try { output = JSON.parse(extractText(data.content)); }
+      catch { throw new HttpException({ error: 'invalid_plan', reason: 'invalid_json' }, 502); }
+      const plan = parseDayPlan(output);
+      if (!plan) throw new HttpException({ error: 'invalid_plan', reason: 'invalid_items' }, 502);
+      return { plan, provenance: { provider: 'Meta', model: data.model, responseId: data.id } };
     }
     const prompt = String(body.prompt || '').slice(0, 60000);
     if (!prompt) throw new HttpException({ error: 'prompt' }, 400);

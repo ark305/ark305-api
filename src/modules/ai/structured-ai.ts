@@ -2,6 +2,10 @@ import { HttpException } from '@nestjs/common';
 import { allQuestions, buildSnapshot, FLOWS, nextQuestion, sanitize, type Answers, type Question } from '../../domain/diagnosis';
 import { findService, SERVICES } from './service-catalog';
 
+// Allow readable Unicode plus tab/CR/LF, but never transport controls or replacement glyphs.
+const INVALID_REPLY_CHARACTERS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\ufffd]/u;
+const REPLY_PATTERN = '^[^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f-\\u009f\\ufffd]*[^\\s\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f-\\u009f\\ufffd][^\\u0000-\\u0008\\u000b\\u000c\\u000e-\\u001f\\u007f-\\u009f\\ufffd]*$';
+
 type Conversation = { role: 'user' | 'assistant'; content: string }[];
 type DiagnosisInput = { message: string; answers: Answers; conversation: Conversation; locale: 'es' | 'en' };
 type Plan = { guests: number; understood: boolean; items: { id: string; time: string; qty: number; guests: number }[] };
@@ -55,7 +59,7 @@ const knownAnswerFields = new Set(['who', ...Object.values(FLOWS).flat().map(que
 export function diagnosisOutputIssue(value: unknown, previous: Answers): DiagnosisIssue | null {
   if (!record(value)) return { field: '$', code: 'invalid_type' };
   if (Object.keys(value).some(key => key !== 'reply' && key !== 'answers')) return { field: '$', code: 'unknown_field' };
-  if (typeof value.reply !== 'string' || !value.reply.trim() || value.reply.length > 1600) return { field: 'reply', code: 'invalid_value' };
+  if (typeof value.reply !== 'string' || !value.reply.trim() || value.reply.length > 1600 || INVALID_REPLY_CHARACTERS.test(value.reply)) return { field: 'reply', code: 'invalid_value' };
   if (!record(value.answers)) return { field: 'answers', code: 'invalid_type' };
   const patch = value.answers as Record<string, unknown>;
   const who = patch.who ?? previous.who;
@@ -83,7 +87,7 @@ export function diagnosisSchema(previous: Answers) {
     required: previous.who === who ? [] : ['who'], properties: { who: { type: 'string', enum: [who] },
       ...Object.fromEntries(questions.map(question => [question.id, questionSchema(question)])) } }));
   return { type: 'object', additionalProperties: false, required: ['reply', 'answers'], properties: {
-    reply: { type: 'string', minLength: 1, maxLength: 1600, pattern: '\\S' }, answers: { anyOf: [...branches, { type: 'object', additionalProperties: false, properties: {} }] },
+    reply: { type: 'string', minLength: 1, maxLength: 1600, pattern: REPLY_PATTERN }, answers: { anyOf: [...branches, { type: 'object', additionalProperties: false, properties: {} }] },
   } };
 }
 
@@ -93,17 +97,26 @@ export function diagnosisPrompt(input: DiagnosisInput) {
   const initial = input.answers.who ? null : Object.fromEntries(Object.entries(FLOWS).map(([who, flow]) => [who, flow.map(describe)]));
   const pending = nextQuestion(input.answers); const snapshot = pending ? null : buildSnapshot(input.answers);
   const system = [input.locale === 'en' ? 'You are ARK, an empathetic ARK305 onboarding guide. Speak clearly and warmly. The user is completing a guided conversation to receive a personalized proposal.' : 'Eres ARK, una guía empática de bienvenida de ARK305. Habla con claridad y calidez. La persona participa en una conversación guiada para recibir una propuesta personalizada.',
-    'Return only JSON matching the supplied schema. `answers` is a patch containing only fields supported by the provided question catalog. Use an enum option ID, not its display label. First extract explicit answers from the latest user message into the patch; never infer answers, and omit unknown or unanswered fields. Update an earlier answer only when the latest user message clearly changes it. After applying the patch, choose the next unanswered field from the appropriate known flow and never re-ask a field answered by this turn. Any proposal must be grounded only in known facts from validated answers. Do not invent prices, providers, availability, bookings, business metrics, medical/legal advice, or permissions. The proposal is explanatory text only; actions and metrics are computed by the application.',
+    'Return only JSON matching the supplied schema. Write reply in readable Unicode, preserving accents and punctuation; never include control characters or textual character-code artifacts. `answers` is a patch containing only fields supported by the provided question catalog. Use an enum option ID, not its display label. First extract explicit answers from the latest user message into the patch; never infer answers, and omit unknown or unanswered fields. Update an earlier answer only when the latest user message clearly changes it. After applying the patch, choose the next unanswered field from the appropriate known flow and never re-ask a field answered by this turn. Any proposal must be grounded only in known facts from validated answers. Do not invent prices, providers, availability, bookings, business metrics, medical/legal advice, or permissions. The proposal is explanatory text only; actions and metrics are computed by the application.',
     `Locale: ${input.locale}. Current validated answers: ${JSON.stringify(input.answers)}. Known questions and allowed values: ${JSON.stringify(questions)}.`,
     ...(initial ? [`First identify who from the user's explicit intent, then extract all explicitly supplied answers from that flow in the same patch. Do not ask again for details already provided. Available flows: ${JSON.stringify(initial)}.`] : []),
     pending ? `After applying the answer patch from this message, ask one clear, conversational question for the next unanswered field in the appropriate known flow. Do not ask for ${pending.id} if the latest message answered it. You may acknowledge the user's message, but do not skip unknown details or fill unanswered fields. If the patch completes all known fields, offer a concise proposal grounded only in the validated answers; do not ask another intake question.` : `All known intake fields are answered. Use the deterministic application snapshot as grounding and offer or adjust a concise proposal. Do not claim the proposal is a booking or verified provider match. Current snapshot: ${JSON.stringify(snapshot)}.`].join('\n\n');
   return { system, messages: [...input.conversation, { role: 'user' as const, content: input.message }] };
 }
 
+// Keep provider quantity constraints identical to parseDayPlan; guests are separate.
+const dayPlanItemSchema = (hourly: boolean) => ({
+  type: 'object', additionalProperties: false, required: ['id', 'time', 'qty'],
+  properties: {
+    id: { type: 'string', enum: SERVICES.filter(service => (service.unit === 'h') === hourly).map(service => service.id) },
+    time: { type: 'string', pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$' },
+    qty: hourly ? { type: 'integer', minimum: 1, maximum: 12 } : { type: 'integer', enum: [1] },
+  },
+});
+
 export const DAY_PLAN_SCHEMA = { type: 'object', additionalProperties: false, required: ['guests', 'understood', 'items'], properties: {
-  guests: { type: 'integer', minimum: 1, maximum: 20 }, understood: { type: 'boolean' }, items: { type: 'array', maxItems: 10, items: { type: 'object', additionalProperties: false, required: ['id', 'time', 'qty'], properties: {
-    id: { type: 'string', enum: SERVICES.map(service => service.id) }, time: { type: 'string', pattern: '^([01][0-9]|2[0-3]):[0-5][0-9]$' }, qty: { type: 'integer', minimum: 1, maximum: 12 },
-  } } },
+  guests: { type: 'integer', minimum: 1, maximum: 20 }, understood: { type: 'boolean' },
+  items: { type: 'array', maxItems: 10, items: { anyOf: [dayPlanItemSchema(true), dayPlanItemSchema(false)] } },
 } };
 
 export function parseDayPlan(value: unknown): Plan | null {
