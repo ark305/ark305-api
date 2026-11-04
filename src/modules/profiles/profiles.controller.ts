@@ -2,11 +2,11 @@ import {
   BadRequestException, Body, Controller, Delete, ForbiddenException, Get, Header, HttpCode, Param,
   Patch, Post, Put, Query, Req, UnauthorizedException,
 } from '@nestjs/common';
-import { Answers, buildSnapshot, sanitize } from '../../domain/diagnosis';
-import { parseSide, sideToExperience } from '../../domain/mode';
-import { AuthenticatedRequest } from '../identity/identity.guard';
-import { Public } from '../identity/public.decorator';
-import { ProfileInput, ProfilesPort, ServiceInput } from './profiles.port';
+import { Answers, buildSnapshot, sanitize } from '../../domain/diagnosis.js';
+import { parseSide, sideToExperience } from '../../domain/mode.js';
+import { AuthenticatedRequest } from '../identity/identity.guard.js';
+import { Public } from '../identity/public.decorator.js';
+import { ProfileInput, ProfilesPort, ServiceInput } from './profiles.port.js';
 
 const HANDLE = /^[a-z0-9._]{3,30}$/;
 const RESERVED = new Set(['admin', 'ark', 'arkai', 'soporte', 'support', 'perfil', 'private', 'lente305', 'bluewater', 'chefadri', 'valentinar', 'skyview', 'noches305', 'danielm', 'aeroframe', 'miamiblackcar', 'camila.edita', 'mateo.cm', 'casalimpia', 'clipkitchen', 'handy305', 'mesa305', 'sunsetcharters', 'ark305', 'bayfrontprivate', 'studiomarfil', 'atlasaviation', 'oceanfleet']);

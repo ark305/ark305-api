@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
-import { IdentityController } from './identity.controller';
-import { IdentityGuard } from './identity.guard';
-import { IdentityPort } from './identity.port';
-import { SupabaseIdentityAdapter } from './supabase-identity.adapter';
+import { IdentityController } from './identity.controller.js';
+import { IdentityGuard } from './identity.guard.js';
+import { IdentityPort } from './identity.port.js';
+import { SupabaseIdentityAdapter } from './supabase-identity.adapter.js';
 
 @Module({
   controllers: [IdentityController],

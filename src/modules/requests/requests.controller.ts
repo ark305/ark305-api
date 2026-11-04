@@ -10,9 +10,9 @@ import {
   Req,
   UnauthorizedException,
 } from '@nestjs/common';
-import { CatalogPort } from '../catalog/catalog.port';
-import { AuthenticatedRequest } from '../identity/identity.guard';
-import { CreateServiceRequest, RequestsPort } from './requests.port';
+import { CatalogPort } from '../catalog/catalog.port.js';
+import { AuthenticatedRequest } from '../identity/identity.guard.js';
+import { CreateServiceRequest, RequestsPort } from './requests.port.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const DATE = /^\d{4}-\d{2}-\d{2}$/;

@@ -1,8 +1,8 @@
 import { BadRequestException, Body, Controller, Get, Header, Param, Patch, Req } from '@nestjs/common';
-import { AuthenticatedRequest } from '../identity/identity.guard';
-import { accessToken } from './requests.controller';
-import { RequestsPort } from './requests.port';
-import { canTransitionRequest, RequestStatus } from './request-lifecycle';
+import { AuthenticatedRequest } from '../identity/identity.guard.js';
+import { accessToken } from './requests.controller.js';
+import { RequestsPort } from './requests.port.js';
+import { canTransitionRequest, RequestStatus } from './request-lifecycle.js';
 
 @Controller('admin/service-requests')
 export class RequestAdministrationController {

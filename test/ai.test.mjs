@@ -1,7 +1,7 @@
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
-const { createServer } = require('node:http');
-const { createApp } = require('../dist/app');
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
+import { createApp } from '../dist/app.js';
 
 test('Nest conversation preserves identity, quota and the generic AI contract', async (t) => {
   const owner = '11111111-1111-4111-8111-111111111111';

@@ -1,7 +1,7 @@
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
-const { createServer } = require('node:http');
-const { createApp } = require('../dist/app');
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
+import { createApp } from '../dist/app.js';
 
 test('administrative requests require verified membership and expected-state writes', async t => {
   const admin = '55555555-5555-4555-8555-555555555555';

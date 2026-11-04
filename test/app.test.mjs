@@ -1,6 +1,6 @@
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
-const { createApp } = require('../dist/app');
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createApp } from '../dist/app.js';
 
 test('API exposes versioned health without external services', async (t) => {
   const app = await createApp();

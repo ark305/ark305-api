@@ -1,6 +1,6 @@
 import { BadRequestException, Controller, Get, NotFoundException, Param } from '@nestjs/common';
-import { CatalogPort } from './catalog.port';
-import { Public } from '../identity/public.decorator';
+import { CatalogPort } from './catalog.port.js';
+import { Public } from '../identity/public.decorator.js';
 
 @Controller('catalog')
 export class CatalogController {

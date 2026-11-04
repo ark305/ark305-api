@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { CatalogPort, CatalogService } from './catalog.port';
-import { demoServices } from './demo-services';
+import { CatalogPort, CatalogService } from './catalog.port.js';
+import { demoServices } from './demo-services.js';
 
 @Injectable()
 export class DemoCatalogAdapter extends CatalogPort {

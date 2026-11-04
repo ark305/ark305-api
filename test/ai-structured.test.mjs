@@ -1,7 +1,7 @@
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
-const { createServer } = require('node:http');
-const { createApp } = require('../dist/app');
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
+import { createApp } from '../dist/app.js';
 
 test('Nest structured AI preserves day-plan and diagnosis contracts', async (t) => {
   const owner = '11111111-1111-4111-8111-111111111111';
@@ -137,8 +137,8 @@ test('Nest structured AI preserves day-plan and diagnosis contracts', async (t) 
   });
 
   await t.test('day-plan schema constrains quantities by catalog unit', async () => {
-    const { SERVICES } = require('../dist/modules/ai/service-catalog');
-    const { parseDayPlan } = require('../dist/modules/ai/structured-ai');
+    const { SERVICES } = await import('../dist/modules/ai/service-catalog.js');
+    const { parseDayPlan } = await import('../dist/modules/ai/structured-ai.js');
     const schema = metaCalls().at(-1).body.output_config.format.schema;
     for (const service of SERVICES) {
       for (const qty of [1, 6, 12]) {
@@ -266,7 +266,7 @@ test('Nest structured AI preserves day-plan and diagnosis contracts', async (t) 
   });
 
   await t.test('diagnosis preserves printable Unicode and rejects corrupt control characters', async () => {
-    const { diagnosisSchema } = require('../dist/modules/ai/structured-ai');
+    const { diagnosisSchema } = await import('../dist/modules/ai/structured-ai.js');
     const schema = diagnosisSchema({});
     const valid = ['?Desde qu? pa?s trabajar?as? ?Tambi?n en remoto! ?and?, ping?ino.', 'Primera l?nea' + String.fromCharCode(10) + 'Segunda l?nea' + String.fromCharCode(9) + '??'];
     for (const reply of valid) {

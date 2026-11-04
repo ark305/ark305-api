@@ -1,7 +1,7 @@
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
-const { TeamProposalsService } = require('../dist/modules/team-proposals/team-proposals.service');
-const { parseTeamPlan } = require('../dist/modules/ai/team-plan');
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { TeamProposalsService } from '../dist/modules/team-proposals/team-proposals.service.js';
+import { parseTeamPlan } from '../dist/modules/ai/team-plan.js';
 
 test('snapshots preserve original names/prices, reject tampering and never invoke AI on read', async () => {
   process.env.TEAM_PROPOSAL_SIGNING_KEY = 'local-test-key-not-a-real-secret-123456';

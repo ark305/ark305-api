@@ -1,5 +1,5 @@
 import { Controller, Get, Header, Req } from '@nestjs/common';
-import { AuthenticatedRequest } from './identity.guard';
+import { AuthenticatedRequest } from './identity.guard.js';
 
 @Controller('me')
 export class IdentityController {

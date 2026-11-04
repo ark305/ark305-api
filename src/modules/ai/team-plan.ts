@@ -1,4 +1,4 @@
-import { TEAM_CATALOG } from './team-catalog';
+import { TEAM_CATALOG } from './team-catalog.js';
 
 type Cadence = 'monthly' | 'one_off' | 'quote';
 type Item = { id: string; hours: number; cadence: Cadence; amount: number | null };

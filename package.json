@@ -9,7 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node --env-file-if-exists=.env.local dist/main.js",
     "start:dev": "tsc-watch -p tsconfig.json --onSuccess \"node --env-file-if-exists=.env.local dist/main.js\"",
-    "test": "npm run build && node --test test/*.test.cjs",
+    "test": "npm run build && node --no-experimental-require-module --test test/*.test.mjs",
     "test:rls": "node test/requests-rls.cjs"
   },
   "dependencies": {
@@ -23,5 +23,6 @@
     "tsc-watch": "7.2.1",
     "@types/node": "^22.0.0",
     "typescript": "~5.9.3"
-  }
+  },
+  "type": "module"
 }

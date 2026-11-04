@@ -1,7 +1,7 @@
 import { ConflictException, ForbiddenException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
-import { getSupabaseConfig } from '../identity/supabase-config';
-import { CreateServiceRequest, RequestEvent, RequestsPort, ServiceRequest } from './requests.port';
-import { canTransitionRequest, RequestStatus } from './request-lifecycle';
+import { getSupabaseConfig } from '../identity/supabase-config.js';
+import { CreateServiceRequest, RequestEvent, RequestsPort, ServiceRequest } from './requests.port.js';
+import { canTransitionRequest, RequestStatus } from './request-lifecycle.js';
 
 const COLUMNS = 'id,requester_id,service_id,requested_date,guests,preferences,status,created_at';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;

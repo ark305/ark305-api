@@ -1,6 +1,6 @@
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
-const { canTransitionRequest } = require('../dist/modules/requests/request-lifecycle');
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { canTransitionRequest } from '../dist/modules/requests/request-lifecycle.js';
 
 test('request lifecycle permits management and cancellation of open requests', () => {
   for (const [from, to] of [

@@ -1,11 +1,11 @@
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
-const { createServer } = require('node:http');
-require('reflect-metadata');
-const { Module } = require('@nestjs/common');
-const { NestFactory } = require('@nestjs/core');
-const { IdentityModule } = require('../dist/modules/identity/identity.module');
-const { ProfilesModule } = require('../dist/modules/profiles/profiles.module');
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
+import 'reflect-metadata';
+import { Module } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { IdentityModule } from '../dist/modules/identity/identity.module.js';
+import { ProfilesModule } from '../dist/modules/profiles/profiles.module.js';
 
 class ProfilesTestModule {}
 Module({ imports: [IdentityModule, ProfilesModule] })(ProfilesTestModule);

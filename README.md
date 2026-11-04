@@ -14,7 +14,7 @@ npm run start:dev
 
 El API escucha por defecto en `http://127.0.0.1:3001`. `PORT` y `HOST` permiten configurarlo. Los scripts cargan `.env.local` opcionalmente; las variables del proceso tienen prioridad. Nunca se versionan credenciales.
 
-En el repositorio web, configurar `frontend/.env.local` con `ARK_API_URL=http://127.0.0.1:3001`, sin `/api/v1`. La web se inicia por separado en el puerto 3100. No colocar claves de Meta en Next.
+En el repositorio web, configurar `.env.local` con `ARK_API_URL=http://127.0.0.1:3001`, sin `/api/v1`. La web se inicia por separado en el puerto 3100. No colocar claves de Meta en Next.
 
 ## Responsabilidades
 
@@ -39,6 +39,16 @@ npm start
 ```
 
 `npm test` compila y ejecuta pruebas HTTP con dependencias controladas, sin llamadas a Meta ni bases remotas. `GET /api/v1/health` confirma el proceso, no la disponibilidad de proveedores.
+
+## Formato de ejecución y Vercel
+
+El backend utiliza ESM nativo (`type: module` y TypeScript `NodeNext`), compatible con los paquetes ESM de NestJS 12. Los imports relativos del código TypeScript deben terminar en `.js`: TypeScript resuelve el archivo fuente y conserva la extensión del JavaScript emitido. No convertirlos a `require()`.
+
+Las pruebas de aplicación están en `test/*.test.mjs`. `npm test` desactiva la compatibilidad `require(esm)` para detectar el error de arranque `ERR_REQUIRE_ESM` observado en Vercel. Los scripts independientes de RLS conservan su extensión `.cjs`.
+
+Para desplegar, utilizar la raíz de este repositorio y la entrada `src/main.ts`. Configurar las variables privadas del backend en Vercel; `.env.vercel` es un archivo local de preparación, no una configuración que se publique automáticamente. Después de desplegar, comprobar `GET /api/v1/health`: debe responder `200` con `{"status":"ok","service":"ark305-api"}`. `/health` no es la ruta del API.
+
+La prueba local de ESM no sustituye la comprobación del despliegue real. Referencias: [NestJS en Vercel](https://vercel.com/docs/frameworks/backend/nestjs) y [migración de NestJS](https://docs.nestjs.com/migration-guide).
 
 La prueba opcional `npm run test:rls` requiere Docker local y la imagen `postgres:17` ya instalada. Crea y elimina únicamente su contenedor aislado, sin red ni puertos publicados. No descarga imágenes ni modifica Supabase remoto.
 

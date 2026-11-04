@@ -1,8 +1,8 @@
 import { HttpException, Injectable } from '@nestjs/common';
 import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto';
-import { getSupabaseConfig } from '../identity/supabase-config';
-import { TEAM_CATALOG } from '../ai/team-catalog';
-import { parseTeamPlan } from '../ai/team-plan';
+import { getSupabaseConfig } from '../identity/supabase-config.js';
+import { TEAM_CATALOG } from '../ai/team-catalog.js';
+import { parseTeamPlan } from '../ai/team-plan.js';
 
 type Generated = { plan: NonNullable<ReturnType<typeof parseTeamPlan>>; provenance: { provider: string; model: string; responseId: string } };
 export type TeamProposal = Omit<Generated, 'plan'> & {

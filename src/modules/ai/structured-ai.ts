@@ -1,6 +1,6 @@
 import { HttpException } from '@nestjs/common';
-import { allQuestions, buildSnapshot, FLOWS, nextQuestion, sanitize, type Answers, type Question } from '../../domain/diagnosis';
-import { findService, SERVICES } from './service-catalog';
+import { allQuestions, buildSnapshot, FLOWS, nextQuestion, sanitize, type Answers, type Question } from '../../domain/diagnosis.js';
+import { findService, SERVICES } from './service-catalog.js';
 
 // Allow readable Unicode plus tab/CR/LF, but never transport controls or replacement glyphs.
 const INVALID_REPLY_CHARACTERS = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f-\u009f\ufffd]/u;

@@ -1,6 +1,6 @@
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
-const { parseTeamPlan, TEAM_SCHEMA } = require('../dist/modules/ai/team-plan');
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { parseTeamPlan, TEAM_SCHEMA } from '../dist/modules/ai/team-plan.js';
 
 test('team cadence must be a primitive string, never a coerced JSON value', () => {
   for (const item of [

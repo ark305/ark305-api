@@ -1,6 +1,6 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
-import { getSupabaseConfig } from '../identity/supabase-config';
-import { ProfileInput, ProfileRecord, ProfilesPort, ServiceInput, ServiceRecord } from './profiles.port';
+import { getSupabaseConfig } from '../identity/supabase-config.js';
+import { ProfileInput, ProfileRecord, ProfilesPort, ServiceInput, ServiceRecord } from './profiles.port.js';
 
 const PRIVATE_COLUMNS = 'id,handle,name,kind,role,area,tagline,photo_url,banner_url,gallery,instagram,tiktok,facebook,bio_link,shared,experience,taste,diagnosis';
 const PUBLIC_COLUMNS = 'id,handle,name,kind,role,area,tagline,photo_url,banner_url,gallery,instagram,tiktok,facebook,bio_link,shared';

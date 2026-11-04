@@ -1,10 +1,11 @@
-const assert = require('node:assert/strict');
-const { test } = require('node:test');
-const fs = require('node:fs');
-const path = require('node:path');
+import { fileURLToPath } from 'node:url';
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+import fs from 'node:fs';
+import path from 'node:path';
 
 test('standalone API owns its schema and RLS fixtures without a web checkout', () => {
-  const root = path.resolve(__dirname, '..');
+  const root = fileURLToPath(new URL('../', import.meta.url));
   const pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
   assert.ok(pkg.dependencies['@nestjs/core']);
   assert.equal(pkg.dependencies.next, undefined);

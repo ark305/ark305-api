@@ -1,7 +1,7 @@
 import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { IdentityPort, Principal } from './identity.port';
-import { PUBLIC_ROUTE } from './public.decorator';
+import { IdentityPort, Principal } from './identity.port.js';
+import { PUBLIC_ROUTE } from './public.decorator.js';
 
 export type AuthenticatedRequest = {
   headers: { authorization?: string };

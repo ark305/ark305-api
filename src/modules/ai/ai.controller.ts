@@ -1,6 +1,6 @@
 import { Body, Controller, Header, HttpCode, Post, Req } from '@nestjs/common';
-import type { AuthenticatedRequest } from '../identity/identity.guard';
-import { AiService } from './ai.service';
+import type { AuthenticatedRequest } from '../identity/identity.guard.js';
+import { AiService } from './ai.service.js';
 
 @Controller('ai')
 export class AiController {

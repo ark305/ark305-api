@@ -1,4 +1,4 @@
-import { CatalogService } from './catalog.port';
+import { CatalogService } from './catalog.port.js';
 
 // Snapshot of prototype descriptions; not confirmed supplier offerings.
 export const demoServices: CatalogService[] = [

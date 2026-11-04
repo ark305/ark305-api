@@ -1,12 +1,12 @@
 import { HttpException, Injectable } from '@nestjs/common';
-import { AiContextAdapter } from './ai-context.adapter';
-import { MetaAdapter } from './meta.adapter';
-import { SYSTEM } from './system-prompts';
-import { SellerDraftService } from './seller-draft';
-import { TeamProposalsService } from '../team-proposals/team-proposals.service';
-import { TEAM_CATALOG } from './team-catalog';
-import { parseTeamPlan, TEAM_SCHEMA, validTeamInput } from './team-plan';
-import { DAY_PLAN_SCHEMA, diagnosisOutputIssue, diagnosisPrompt, diagnosisSchema, formatDiagnosis, parseDayPlan, parseDiagnosisInput } from './structured-ai';
+import { AiContextAdapter } from './ai-context.adapter.js';
+import { MetaAdapter } from './meta.adapter.js';
+import { SYSTEM } from './system-prompts.js';
+import { SellerDraftService } from './seller-draft.js';
+import { TeamProposalsService } from '../team-proposals/team-proposals.service.js';
+import { TEAM_CATALOG } from './team-catalog.js';
+import { parseTeamPlan, TEAM_SCHEMA, validTeamInput } from './team-plan.js';
+import { DAY_PLAN_SCHEMA, diagnosisOutputIssue, diagnosisPrompt, diagnosisSchema, formatDiagnosis, parseDayPlan, parseDiagnosisInput } from './structured-ai.js';
 
 @Injectable()
 export class AiService {
@@ -91,7 +91,7 @@ Catalog prices are DEMO estimates, not quotes. Do not invent prices, candidates,
   }
 }
 
-import { SERVICES } from './service-catalog';
+import { SERVICES } from './service-catalog.js';
 function SERVICES_FOR_PROMPT(locale: 'es' | 'en') {
   return SERVICES.map(({ id, name, description, unit }) => ({ id, name: name[locale], description: description[locale], unit }));
 }

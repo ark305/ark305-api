@@ -1,4 +1,4 @@
-import type { RequestStatus } from './request-lifecycle';
+import type { RequestStatus } from './request-lifecycle.js';
 
 export type CreateServiceRequest = {
   serviceId: string;

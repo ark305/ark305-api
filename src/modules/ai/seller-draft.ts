@@ -1,7 +1,7 @@
 import { HttpException, Injectable } from '@nestjs/common';
-import { ProfilesPort } from '../profiles/profiles.port';
-import { AiContextAdapter } from './ai-context.adapter';
-import { MetaAdapter } from './meta.adapter';
+import { ProfilesPort } from '../profiles/profiles.port.js';
+import { AiContextAdapter } from './ai-context.adapter.js';
+import { MetaAdapter } from './meta.adapter.js';
 
 type Input = { task: 'seller-draft'; action: 'post' | 'reply' | 'price'; locale: 'es' | 'en'; tone: 'business' | 'lifestyle'; serviceId: string; context?: string; customerMessage?: string; cost?: number; marginPercent?: number };
 const record = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);

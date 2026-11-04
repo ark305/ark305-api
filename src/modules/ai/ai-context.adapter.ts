@@ -1,5 +1,5 @@
 import { HttpException, Injectable } from '@nestjs/common';
-import { getSupabaseConfig } from '../identity/supabase-config';
+import { getSupabaseConfig } from '../identity/supabase-config.js';
 
 @Injectable()
 export class AiContextAdapter {

@@ -1,12 +1,12 @@
-const assert = require('node:assert/strict');
-const { createHash } = require('node:crypto');
-const { createServer } = require('node:http');
-const { test } = require('node:test');
-require('reflect-metadata');
-const { Module } = require('@nestjs/common');
-const { NestFactory } = require('@nestjs/core');
-const { IdentityModule } = require('../dist/modules/identity/identity.module');
-const { ProfilesModule } = require('../dist/modules/profiles/profiles.module');
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { createServer } from 'node:http';
+import { test } from 'node:test';
+import 'reflect-metadata';
+import { Module } from '@nestjs/common';
+import { NestFactory } from '@nestjs/core';
+import { IdentityModule } from '../dist/modules/identity/identity.module.js';
+import { ProfilesModule } from '../dist/modules/profiles/profiles.module.js';
 
 class SnapshotTestModule {}
 Module({ imports: [IdentityModule, ProfilesModule] })(SnapshotTestModule);

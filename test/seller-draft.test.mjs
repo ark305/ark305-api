@@ -1,6 +1,6 @@
-const { test } = require('node:test');
-const assert = require('node:assert/strict');
-const { SellerDraftService } = require('../dist/modules/ai/seller-draft');
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { SellerDraftService } from '../dist/modules/ai/seller-draft.js';
 const owner = '11111111-1111-4111-8111-111111111111';
 const serviceId = '22222222-2222-4222-8222-222222222222';
 function fixture() {

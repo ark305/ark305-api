@@ -1,7 +1,7 @@
 import { BadRequestException, Controller, Get, Header, Module, NotFoundException, Param, Req } from '@nestjs/common';
-import { accessToken } from '../requests/requests.controller';
-import { AuthenticatedRequest } from '../identity/identity.guard';
-import { TeamProposalsService } from './team-proposals.service';
+import { accessToken } from '../requests/requests.controller.js';
+import { AuthenticatedRequest } from '../identity/identity.guard.js';
+import { TeamProposalsService } from './team-proposals.service.js';
 
 @Controller('team-proposals')
 class TeamProposalsController {

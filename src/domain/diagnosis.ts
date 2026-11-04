@@ -3,8 +3,8 @@
 // Las reglas son simples y explicables ("Porque tú..."). En la etapa de IA real,
 // Meta escribirá el resumen con estos mismos datos; los números nunca se inventan.
 // Nunca pregunta ni deduce estatus migratorio, salud, religión, orientación ni política.
-import type { Locale, Localized } from "./locale";
-import type { Side } from "./mode";
+import type { Locale, Localized } from "./locale.js";
+import type { Side } from "./mode.js";
 
 export type Who = "individual" | "earner" | "company" | "enterprise";
 export type Answers = Partial<Record<string, string | string[]>> & { who?: Who };

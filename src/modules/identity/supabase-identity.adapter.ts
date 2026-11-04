@@ -1,6 +1,6 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
-import { IdentityPort, Principal } from './identity.port';
-import { getSupabaseConfig } from './supabase-config';
+import { IdentityPort, Principal } from './identity.port.js';
+import { getSupabaseConfig } from './supabase-config.js';
 
 @Injectable()
 export class SupabaseIdentityAdapter extends IdentityPort {
