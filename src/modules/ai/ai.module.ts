@@ -5,6 +5,7 @@ import { AiContextAdapter } from './ai-context.adapter';
 import { MetaAdapter } from './meta.adapter';
 import { ProfilesModule } from '../profiles/profiles.module';
 import { SellerDraftService } from './seller-draft';
+import { TeamProposalsModule } from '../team-proposals/team-proposals.module';
 
-@Module({ imports: [ProfilesModule], controllers: [AiController], providers: [AiService, AiContextAdapter, MetaAdapter, SellerDraftService] })
+@Module({ imports: [ProfilesModule, TeamProposalsModule], controllers: [AiController], providers: [AiService, AiContextAdapter, MetaAdapter, SellerDraftService] })
 export class AiModule {}

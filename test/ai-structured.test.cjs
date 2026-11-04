@@ -5,17 +5,23 @@ const { createApp } = require('../dist/app');
 
 test('Nest structured AI preserves day-plan and diagnosis contracts', async (t) => {
   const owner = '11111111-1111-4111-8111-111111111111';
-  const keys = ['SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY', 'META_API_KEY', 'META_BASE_URL', 'AI_DAILY_LIMIT'];
+  const keys = ['SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY', 'META_API_KEY', 'META_BASE_URL', 'AI_DAILY_LIMIT', 'TEAM_PROPOSAL_SIGNING_KEY'];
   const saved = Object.fromEntries(keys.map(key => [key, process.env[key]]));
   const calls = [];
   let quotaStatus = 200;
   let quotaValue = true;
   let providerPayload;
+  let storedProposals = [], storageFails = false;
   const provider = createServer(async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
     let raw = ''; for await (const chunk of req) raw += chunk;
     const body = raw ? JSON.parse(raw) : undefined;
     calls.push({ path: req.url, body });
+    if (req.url.startsWith('/rest/v1/team_proposals')) {
+      if (storageFails && req.method === 'POST') { res.statusCode=503; return res.end('{}'); }
+      if (req.method === 'POST') storedProposals = [body];
+      return res.end(JSON.stringify(req.url.includes('limit=0') ? [] : storedProposals));
+    }
     if (req.url === '/auth/v1/user') return res.end(JSON.stringify({ id: owner }));
     if (req.url === '/rest/v1/rpc/bump_ai') {
       res.statusCode = quotaStatus; return res.end(JSON.stringify(quotaValue));
@@ -37,6 +43,7 @@ test('Nest structured AI preserves day-plan and diagnosis contracts', async (t) 
     return realFetch(input, init);
   };
   Object.assign(process.env, { SUPABASE_URL: providerUrl, SUPABASE_PUBLISHABLE_KEY: 'public-test', META_API_KEY: 'meta-test', META_BASE_URL: 'https://api.meta.ai', AI_DAILY_LIMIT: '7' });
+  process.env.TEAM_PROPOSAL_SIGNING_KEY = 'local-test-signing-key-not-a-secret-123456';
   const app = await createApp(); await app.listen(0, '127.0.0.1');
   t.after(async () => {
     await app.close(); provider.closeAllConnections(); await new Promise(resolve => provider.close(resolve));
@@ -77,6 +84,24 @@ test('Nest structured AI preserves day-plan and diagnosis contracts', async (t) 
     assert.equal(result.plan.oneOffTotal, 145);
     assert.equal(result.provenance.responseId, 'msg-team');
     assert.equal(result.provenance.provider, 'Meta');
+    assert.equal(result.storage.saved, true);
+    const countBeforeRead = metaCalls().length;
+    const listUrl = `${await app.getUrl()}/api/v1/team-proposals`;
+    assert.equal((await fetch(listUrl)).status, 401);
+    const history = await fetch(listUrl, {headers:{authorization:'Bearer user-token'}});
+    assert.equal(history.status,200);
+    const savedItems = (await history.json()).items;
+    assert.equal(savedItems[0].id, result.storage.id);
+    assert.equal(savedItems[0].plan.monthlyTotal,779);
+    assert.equal(metaCalls().length,countBeforeRead);
+    const detail = await fetch(`${listUrl}/${result.storage.id}`,{headers:{authorization:'Bearer user-token'}});
+    assert.equal(detail.status,200); assert.equal((await detail.json()).provenance.responseId,'msg-team');
+    storageFails=true;
+    const unsaved = await send(body); assert.equal(unsaved.status,200); assert.equal((await unsaved.json()).storage.saved,false);
+    assert.equal(metaCalls().length,countBeforeRead+1); storageFails=false;
+    const signingKey=process.env.TEAM_PROPOSAL_SIGNING_KEY; delete process.env.TEAM_PROPOSAL_SIGNING_KEY;
+    const beforeMissingKey=metaCalls().length; assert.equal((await send(body)).status,503);
+    assert.equal(metaCalls().length,beforeMissingKey); process.env.TEAM_PROPOSAL_SIGNING_KEY=signingKey;
     quotaStatus = 503;
     const count = metaCalls().length;
     assert.equal((await send(body)).status, 503);

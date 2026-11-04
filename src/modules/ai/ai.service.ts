@@ -3,13 +3,14 @@ import { AiContextAdapter } from './ai-context.adapter';
 import { MetaAdapter } from './meta.adapter';
 import { SYSTEM } from './system-prompts';
 import { SellerDraftService } from './seller-draft';
+import { TeamProposalsService } from '../team-proposals/team-proposals.service';
 import { TEAM_CATALOG } from './team-catalog';
 import { parseTeamPlan, TEAM_SCHEMA, validTeamInput } from './team-plan';
 import { DAY_PLAN_SCHEMA, diagnosisOutputIssue, diagnosisPrompt, diagnosisSchema, formatDiagnosis, parseDayPlan, parseDiagnosisInput } from './structured-ai';
 
 @Injectable()
 export class AiService {
-  constructor(private readonly context: AiContextAdapter, private readonly meta: MetaAdapter, private readonly seller: SellerDraftService) {}
+  constructor(private readonly context: AiContextAdapter, private readonly meta: MetaAdapter, private readonly seller: SellerDraftService, private readonly proposals: TeamProposalsService) {}
 
   async generate(input: unknown, token: string, userId: string) {
     this.meta.configuration();
@@ -26,6 +27,7 @@ export class AiService {
         typeof body.guests !== 'number' || !Number.isInteger(body.guests) || body.guests < 1 || body.guests > 20)) throw new HttpException({ error: 'prompt' }, 400);
     const locale = body.locale === 'en' ? 'en' : 'es';
     if (dayPlan || diagnosis || teamPlan) this.meta.configuration(true);
+    if (teamPlan) await this.proposals.ready(token, userId);
     const mode = await this.context.load(token, userId, locale, dayPlan || diagnosis || teamPlan);
     if (teamPlan) {
       const system = `You are ARK's business team planning assistant. Respond in ${locale}. ${mode}
@@ -40,7 +42,14 @@ Catalog prices are DEMO estimates, not quotes. Do not invent prices, candidates,
       catch { throw new HttpException({ error: 'invalid_plan', reason: 'invalid_json' }, 502); }
       const plan = parseTeamPlan(output);
       if (!plan) throw new HttpException({ error: 'invalid_plan', reason: 'invalid_items' }, 502);
-      return { plan, provenance: { provider: 'Meta', model: data.model, responseId: data.id } };
+      const result = { plan, provenance: { provider: 'Meta', model: data.model, responseId: data.id } };
+      try {
+        const saved = await this.proposals.save(token, userId, body.prompt as string, locale, result);
+        return { ...result, storage: { saved: true, id: saved.id } };
+      } catch {
+        // Preserve the paid generation; never silently regenerate on persistence failure.
+        return { ...result, storage: { saved: false } };
+      }
     }
     if (diagnosisInput) {
       const prompt = diagnosisPrompt(diagnosisInput);
