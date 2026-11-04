@@ -2,6 +2,8 @@ import { HttpException, Injectable } from '@nestjs/common';
 import { AiContextAdapter } from './ai-context.adapter';
 import { MetaAdapter } from './meta.adapter';
 import { SYSTEM } from './system-prompts';
+import { TEAM_CATALOG } from './team-catalog';
+import { parseTeamPlan, TEAM_SCHEMA, validTeamInput } from './team-plan';
 import { DAY_PLAN_SCHEMA, diagnosisOutputIssue, diagnosisPrompt, diagnosisSchema, formatDiagnosis, parseDayPlan, parseDiagnosisInput } from './structured-ai';
 
 @Injectable()
@@ -14,13 +16,30 @@ export class AiService {
     const body = input as Record<string, unknown>;
     const dayPlan = body.task === 'day-plan';
     const diagnosis = body.task === 'diagnosis';
+    const teamPlan = body.task === 'team-plan';
+    if (teamPlan && !validTeamInput(body)) throw new HttpException({ error: 'prompt' }, 400);
     const diagnosisInput = diagnosis ? parseDiagnosisInput(body) : null;
     if (diagnosis && !diagnosisInput) throw new HttpException({ error: 'diagnosis_input' }, 400);
     if (dayPlan && (typeof body.prompt !== 'string' || !body.prompt.trim() || body.prompt.length > 4000 ||
         typeof body.guests !== 'number' || !Number.isInteger(body.guests) || body.guests < 1 || body.guests > 20)) throw new HttpException({ error: 'prompt' }, 400);
     const locale = body.locale === 'en' ? 'en' : 'es';
-    if (dayPlan || diagnosis) this.meta.configuration(true);
-    const mode = await this.context.load(token, userId, locale, dayPlan || diagnosis);
+    if (dayPlan || diagnosis || teamPlan) this.meta.configuration(true);
+    const mode = await this.context.load(token, userId, locale, dayPlan || diagnosis || teamPlan);
+    if (teamPlan) {
+      const system = `You are ARK's business team planning assistant. Respond in ${locale}. ${mode}
+Return only the supplied JSON schema. Select at most 8 distinct catalog IDs relevant to the request. If unrelated or insufficient information, understood=false and items=[]; explain briefly in rationale. Otherwise understood=true.
+Use monthly for recurring hourly roles (hours per week, 1-40), or one_off for a single hourly job (total hours, 1-40). For unit m use monthly and hours=0; f/p use one_off and hours=0 for ONE unit only; q use quote and hours=0. Never convert fixed jobs into monthly costs. State any assumed scope in rationale and ask for clarification when necessary.
+Catalog prices are DEMO estimates, not quotes. Do not invent prices, candidates, providers, contracts, availability or completed actions. Rationale must be readable Unicode. Catalog: ${JSON.stringify(TEAM_CATALOG.map(({ id, name, description, unit }) => ({ id, name: name[locale], description: description[locale], unit })))}`;
+      const data = await this.meta.structured(system, [{ role: 'user', content: body.prompt as string }], TEAM_SCHEMA, 4096, false, false);
+      if (data.stop_reason === 'max_tokens') throw new HttpException({ error: 'invalid_plan', reason: 'truncated' }, 502);
+      if (data.stop_reason !== 'end_turn' || typeof data.model !== 'string' || !data.model.trim() || typeof data.id !== 'string' || !data.id.trim() || !Array.isArray(data.content)) throw new HttpException({ error: 'invalid_plan', reason: 'invalid_metadata' }, 502);
+      let output: unknown;
+      try { output = JSON.parse(extractText(data.content)); }
+      catch { throw new HttpException({ error: 'invalid_plan', reason: 'invalid_json' }, 502); }
+      const plan = parseTeamPlan(output);
+      if (!plan) throw new HttpException({ error: 'invalid_plan', reason: 'invalid_items' }, 502);
+      return { plan, provenance: { provider: 'Meta', model: data.model, responseId: data.id } };
+    }
     if (diagnosisInput) {
       const prompt = diagnosisPrompt(diagnosisInput);
       const data = await this.meta.structured(prompt.system + mode, prompt.messages, diagnosisSchema(diagnosisInput.answers), 4096, true, body.tier === 'quick');

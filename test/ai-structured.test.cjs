@@ -42,6 +42,32 @@ test('Nest structured AI preserves day-plan and diagnosis contracts', async (t) 
   const url = `${await app.getUrl()}/api/v1/ai`;
   const send = (body, token = 'user-token') => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) });
   const metaCalls = () => calls.filter(call => call.path === '/v1/messages');
+  await t.test('team-plan uses strict quota, server prices and real provider metadata', async () => {
+    const body = { task: 'team-plan', prompt: 'Un community manager y una limpieza puntual.', locale: 'es' };
+    const before = calls.length;
+    assert.equal((await send({ ...body, prompt: '' })).status, 400);
+    assert.equal(calls.slice(before).some(c => c.path === '/rest/v1/rpc/bump_ai' || c.path === '/v1/messages'), false);
+    const output = { understood: true, rationale: 'Un rol recurrente y una limpieza puntual.', items: [
+      { id: 'r-cm', hours: 10, cadence: 'monthly' }, { id: 'turn', hours: 0, cadence: 'one_off' },
+    ] };
+    providerPayload = { stop_reason: 'end_turn', model: 'muse-test', id: 'msg-team', content: [{ type: 'text', text: JSON.stringify(output) }] };
+    const response = await send(body);
+    assert.equal(response.status, 200);
+    const result = await response.json();
+    assert.equal(result.plan.monthlyTotal, 779);
+    assert.equal(result.plan.oneOffTotal, 145);
+    assert.equal(result.provenance.responseId, 'msg-team');
+    assert.equal(result.provenance.provider, 'Meta');
+    quotaStatus = 503;
+    const count = metaCalls().length;
+    assert.equal((await send(body)).status, 503);
+    assert.equal(metaCalls().length, count);
+    quotaStatus = 200;
+    providerPayload.stop_reason = 'max_tokens';
+    const failure = await send(body);
+    assert.equal(failure.status, 502);
+    assert.deepEqual(await failure.json(), { error: 'invalid_plan', reason: 'truncated' });
+  });
   const schemaAccepts = (schema, value) => {
     if (schema.anyOf) return schema.anyOf.some(branch => schemaAccepts(branch, value));
     if (schema.enum && !schema.enum.includes(value)) return false;
