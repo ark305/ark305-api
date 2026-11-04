@@ -60,4 +60,10 @@ La prueba opcional `npm run test:rls` requiere Docker local y la imagen `postgre
 
 `docs/origen-monorepo/` conserva documentos históricos para trazabilidad. Sus rutas y comandos reflejan el monorepo anterior; esta guía define el funcionamiento independiente actual.
 
-El historial de `backend/` fue extraído del repositorio web, sin reescribirlo. El despliegue sigue pendiente: el proyecto del API debe utilizar la raíz de este repositorio, configurar sus variables privadas y exponer una URL HTTPS para `ARK_API_URL`.
+El historial de `backend/` fue extraído del repositorio web, sin reescribirlo. Existe un despliegue previo del API, pero los cambios de esta rama no están publicados ni se verificaron allí. Al desplegar, el proyecto debe utilizar la raíz de este repositorio, configurar sus variables privadas y exponer una URL HTTPS para `ARK_API_URL`.
+
+## MVP de hackathon
+
+Proceso, pruebas y limites: [Guia de los tres flujos](docs/HACKATHON_MVP.md).
+
+Antes de entregar: [auditoría y puertas de publicación](docs/HACKATHON_RELEASE_AUDIT.md) y [guion de video](docs/HACKATHON_VIDEO.md). Este repositorio utiliza la [licencia MIT](LICENSE), con ARK305 como titular. La publicación sigue pendiente de autorización.
