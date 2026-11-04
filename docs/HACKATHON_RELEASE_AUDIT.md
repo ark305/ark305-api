@@ -9,8 +9,8 @@
 | Tres flujos del MVP | Recorridos ES y EN en navegador, con solicitudes y complementos persistidos | Probar el despliegue final en incógnito |
 | Revisión de código | Unidades principales aprobadas y reconocidas; sin bloqueadores | Dos advertencias no bloqueantes de API detalladas abajo; evaluar nuevos cambios ejecutables antes de entregar |
 | Secretos | Sin candidatos confirmados en archivos versionados ni en los parches históricos revisados | Revisión final del diff y herramientas de secret scanning del anfitrión |
-| Marca restringida | Sin coincidencias textuales con los nombres y variantes de la marca de terceros en los dos repositorios ni en sus parches históricos | Inspección visual de imágenes, video y metadatos antes de hacerlos públicos |
-| Licencia | ARK305 autorizó MIT para ambos repositorios; los archivos `LICENSE` y los avisos README están preparados localmente | Confirmar que los archivos figuran en los commits definitivos |
+| Marca restringida | Sin coincidencias textuales en los repositorios ni en sus parches históricos; se inspeccionaron visualmente la imagen social y el logo de correo | Revisar los demás recursos visuales, el video y sus metadatos antes de publicarlos |
+| Licencia | ARK305 autorizó MIT; ambos `LICENSE` tienen el mismo SHA-256 y figuran en los commits locales | Comprobar el aviso y la visibilidad al publicar |
 | Producción | Archivos privados `.env.vercel` presentes, completos y excluidos de Git | Confirmar variables efectivas en Vercel, desplegar y probar URL pública |
 | Publicación | Cadena de rama funcional elegida para commits locales; sin push ni PR | Verificar cada unidad y autorizar por separado cualquier push/cambio de visibilidad/despliegue |
 
@@ -19,6 +19,7 @@
 - Se revisaron los archivos versionados y los parches de todas las referencias Git locales: **63 commits web** y **33 commits API** al momento de esta auditoría. No se inspeccionó un historial remoto no presente en los clones.
 - Se buscaron prefijos de credenciales conocidos y asignaciones de claves privadas, además de las marcas indicadas en el plan. Las coincidencias de secretos detectadas pertenecen a archivos de prueba y requieren contraste final; ningún valor se reproduce aquí.
 - El barrido textual **no detecta secretos de formato desconocido** ni texto contenido en imágenes binarias. Tampoco demuestra que un secreto jamás haya aparecido en un commit remoto reescrito o no descargado.
+- La inspección visual de `public/og.png` mostró solo la marca ARK305 y su lema; los dos ejemplares de `ark-logo-email.png` son idénticos por SHA-256 y muestran el logo ARK305. El SVG `logoark.svg` no contiene elementos `<image>`, `<script>` ni `<text>`, ni atributos `href`; su declaración DOCTYPE sí referencia el estándar SVG externo. Esta comprobación de estructura no sustituye una revisión visual de todos los recursos ni del video.
 - `.env.local` y `.env.vercel` están ignorados por Git. Se comprobó solo presencia, no vaciedad y origen de las URL; no se imprimieron valores privados.
 - Web: `ARK_API_URL` apunta a `ark305-api.vercel.app` y la URL pública de Supabase al proyecto `bxvljzrodkvpxsebfvvy`. API: `MODEL_API_KEY` está presente, `META_BASE_URL` apunta a `api.meta.ai` y Supabase al mismo proyecto. Esto **no confirma** las variables efectivas del panel de Vercel.
 - Se aplicó con autorización la migración de complementos al Supabase de pruebas. Su versión remota (`20261104171447`) difiere de la versión del archivo local (`20261104162321`); no ejecutar `db push` por lotes sin reconciliar el historial.
@@ -51,8 +52,8 @@ Las unidades descritas existen solo en los repositorios locales. La cadena inclu
 
 ## Puertas de entrega
 
-- [ ] Confirmar que la licencia MIT, los archivos `LICENSE` y los avisos README figuran en los commits definitivos de ambos repositorios.
-- [ ] Revisión manual de imágenes y video para marca restringida y datos sensibles.
+- [x] Confirmar que la licencia MIT, los archivos `LICENSE` y los avisos README figuran en los commits locales de ambos repositorios.
+- [ ] Completar la revisión visual de los recursos restantes y del video para marca restringida y datos sensibles.
 - [ ] Auditoría final de secretos sobre los commits definitivos y comprobación del historial remoto.
 - [ ] Variables reales de Vercel confirmadas sin mostrar secretos; despliegue y prueba ES/EN en incógnito.
 - [ ] Repositorios y video accesibles con la visibilidad autorizada.
