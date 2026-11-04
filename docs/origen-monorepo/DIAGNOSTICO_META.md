@@ -16,7 +16,7 @@ Solo al confirmar la propuesta se guardan las respuestas saneadas en el formato 
 
 ## Configuración y límites
 
-En el entorno de servidor de Vercel deben configurarse las variables privadas ya usadas por la aplicación para Supabase y Meta, en particular `META_API_KEY`; no se debe exponer una clave de proveedor al navegador. La configuración de la base conserva la cuota `bump_ai`. La llamada de diagnóstico usa el endpoint Meta configurado, límite de tiempo y validación estricta de la respuesta estructurada. Una respuesta malformada produce error, no una propuesta alternativa.
+En el entorno de servidor de Vercel deben configurarse las variables privadas ya usadas por la aplicación para Supabase y Meta, en particular `MODEL_API_KEY`; no se debe exponer una clave de proveedor al navegador. La configuración de la base conserva la cuota `bump_ai`. La llamada de diagnóstico usa el endpoint Meta configurado, límite de tiempo y validación estricta de la respuesta estructurada. Una respuesta malformada produce error, no una propuesta alternativa.
 
 La documentación de configuración de producción debe seguir las variables y políticas del despliegue vigente. Esta guía no prueba credenciales, conexión a Meta, Supabase remoto ni configuración de Vercel.
 

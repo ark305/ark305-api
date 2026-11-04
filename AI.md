@@ -8,7 +8,7 @@ Nest concentra la autenticación, la cuota, el contexto del perfil y las llamada
 |---|---|---|
 | `SUPABASE_URL` | Nest | Verificar identidad y consultar cuota/contexto con el JWT del usuario. |
 | `SUPABASE_PUBLISHABLE_KEY` | Nest | Clave pública para las solicitudes delegadas a Supabase. |
-| `META_API_KEY` | Nest | Credencial privada de Meta; no debe configurarse en Next ni exponerse al navegador. |
+| `MODEL_API_KEY` | Nest | Credencial privada de Meta; no debe configurarse en Next ni exponerse al navegador. |
 | `META_BASE_URL` | Nest | Origen de Meta; los modos estructurados aceptan el origen oficial `https://api.meta.ai`. |
 | `AI_DAILY_LIMIT` | Nest | Límite enviado a la RPC `bump_ai` (por defecto: 60). |
 | `META_MODEL`, `META_MODEL_QUICK` | Nest | Modelos predeterminado y rápido. |
