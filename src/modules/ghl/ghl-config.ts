@@ -18,12 +18,18 @@ export function getGhlConfig(env: NodeJS.ProcessEnv = process.env): GhlConfig | 
   const pipelineId = env.GHL_PIPELINE_ID?.trim() || undefined;
   const pipelineStageId = env.GHL_PIPELINE_STAGE_ID?.trim() || undefined;
   if ((pipelineId && !GHL_ID.test(pipelineId)) || (pipelineStageId && !GHL_ID.test(pipelineStageId))) return null;
+  const baseUrl = getGhlBaseUrl(env);
+  return baseUrl ? { apiKey, locationId, baseUrl, pipelineId, pipelineStageId } : null;
+}
+
+// Shared by ARK's own account and connected provider accounts.
+export function getGhlBaseUrl(env: NodeJS.ProcessEnv = process.env): URL | null {
   try {
     const baseUrl = new URL(env.GHL_BASE_URL?.trim() || GHL_DEFAULT_BASE_URL);
     const local = ['localhost', '127.0.0.1', '[::1]'].includes(baseUrl.hostname);
     if ((baseUrl.protocol !== 'https:' && !(local && baseUrl.protocol === 'http:')) ||
         baseUrl.username || baseUrl.password || baseUrl.search || baseUrl.hash || baseUrl.pathname !== '/') return null;
-    return { apiKey, locationId, baseUrl, pipelineId, pipelineStageId };
+    return baseUrl;
   } catch {
     return null;
   }
