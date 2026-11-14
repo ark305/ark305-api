@@ -35,7 +35,7 @@ export class ProviderApprovalService {
   }
 
   async decide(token: string, viewerId: string, applicantId: string, decision: string): Promise<ProviderApplication> {
-    if (!UUID.test(applicantId) || !(decision in DECISIONS)) throw new BadRequestException('Invalid provider decision');
+    if (!UUID.test(applicantId) || !Object.hasOwn(DECISIONS, decision)) throw new BadRequestException('Invalid provider decision');
     await this.requireOperator(token, viewerId);
     const application = await this.profiles.decideProviderApplication(token, applicantId.toLowerCase(), DECISIONS[decision]);
     if (!application) throw new NotFoundException('No pending provider application');

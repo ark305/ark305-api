@@ -58,7 +58,9 @@ test('only operators list and decide applications', async () => {
   assert.equal((await service.decide('tok', operator, member, 'reject')).status, 'rejected');
   await assert.rejects(service.decide('tok', operator, operator, 'approve'), { status: 404 });
   await assert.rejects(service.decide('tok', operator, 'not-a-uuid', 'approve'), { status: 400 });
-  await assert.rejects(service.decide('tok', operator, member, 'promote'), { status: 400 });
+  for (const decision of ['promote', 'constructor', 'toString', '__proto__']) {
+    await assert.rejects(service.decide('tok', operator, member, decision), { status: 400 });
+  }
   assert.deepEqual(port.calls, [['list', 'pending'], ['list', 'rejected'], ['decide', member, true], ['decide', member, false], ['decide', operator, true]]);
 });
 
