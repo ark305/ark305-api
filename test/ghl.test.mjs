@@ -62,6 +62,8 @@ test('contact parsing rejects unknown keys, bad formats and empty identities', (
     [{ email: 'a@b.co', firstName: 'x'.repeat(121) }, false], [{ email: 'a@b.co', firstName: 'bad\u0000' }, false],
   ]) assert.throws(() => parseContactInput(body, partial), error => error.getStatus() === 400, JSON.stringify(body));
   assert.deepEqual(parseContactInput({ phone: '+13055550100', timezone: 'America/New_York' }, false), { phone: '+13055550100', timezone: 'America/New_York' });
+  for (const zone of ['UTC', 'Etc/UTC', 'utc']) assert.equal(parseContactInput({ phone: '+13055550100', timezone: zone }, false).timezone, 'UTC');
+  assert.throws(() => parseContactInput({ phone: '+13055550100', timezone: 'America/New_York\u0000' }, false), error => error.getStatus() === 400);
 });
 
 test('service orders become open opportunities in the env-configured pipeline and stage', async () => {
@@ -125,6 +127,9 @@ test('availability converts whole UTC days to epoch ms and returns sorted slots'
     { date: '2027-01-15', slots: ['2027-01-15T09:00:00-05:00'] }, { date: '2027-01-16', slots: ['2027-01-16T10:00:00-05:00'] }] });
   assert.deepEqual(client.calls[0], { method: 'GET', path: '/calendars/cal1/free-slots', version: '2021-04-15',
     query: { startDate: String(Date.UTC(2027, 0, 15)), endDate: String(Date.UTC(2027, 0, 17) - 1), timezone: 'America/New_York' } });
+  const utc = fakeClient({});
+  assert.equal((await new GhlService(utc).availability('cal1', '2027-01-15', '2027-01-15', 'UTC')).timezone, 'UTC');
+  assert.equal(utc.calls[0].query.timezone, 'UTC');
   const service = new GhlService(fakeClient({}));
   for (const args of [['cal1', '2027-01-16', '2027-01-15'], ['cal1', '2027-01-01', '2027-02-01'], ['cal1', '2027-02-30', '2027-03-01'],
     ['cal1', '15/01/2027', '2027-01-16'], ['cal1', undefined, '2027-01-16'], ['cal/1', '2027-01-15', '2027-01-16'], ['cal1', '2027-01-15', '2027-01-16', 'Nowhere']]) {

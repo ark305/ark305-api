@@ -29,6 +29,12 @@ const text = (value: unknown, max: number) =>
   typeof value === 'string' && value.trim().length > 0 && value.length <= max && !/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/.test(value);
 const optionalString = (value: unknown) => (typeof value === 'string' ? value : null);
 
+// Intl.supportedValuesOf('timeZone') omits valid aliases such as UTC, so ask the formatter and keep its canonical name.
+function canonicalTimeZone(value: unknown): string | null {
+  if (typeof value !== 'string' || !/^[A-Za-z][A-Za-z0-9_+\/-]{0,63}$/.test(value)) return null;
+  try { return new Intl.DateTimeFormat('en-US', { timeZone: value }).resolvedOptions().timeZone; } catch { return null; }
+}
+
 export function assertGhlId(value: unknown, what = 'ID'): asserts value is string {
   if (typeof value !== 'string' || !GHL_ID.test(value)) throw invalid(what);
 }
@@ -58,8 +64,9 @@ export function parseContactInput(body: unknown, partial: boolean): GhlContactIn
     contact.phone = phone;
   }
   if (body.timezone !== undefined) {
-    if (typeof body.timezone !== 'string' || !text(body.timezone, 64) || !Intl.supportedValuesOf('timeZone').includes(body.timezone)) throw invalid('contact');
-    contact.timezone = body.timezone;
+    const timezone = canonicalTimeZone(body.timezone);
+    if (!timezone) throw invalid('contact');
+    contact.timezone = timezone;
   }
   if (body.tags !== undefined) {
     if (!Array.isArray(body.tags) || body.tags.length > 20 || body.tags.some(tag => !text(tag, 64))) throw invalid('contact');
@@ -178,15 +185,16 @@ export class GhlService {
     const start = parseIsoDate(startDate, 'availability range');
     const end = parseIsoDate(endDate, 'availability range');
     if (end < start || (end - start) / DAY_MS >= MAX_RANGE_DAYS) throw invalid('availability range');
-    if (timezone !== undefined && (typeof timezone !== 'string' || !Intl.supportedValuesOf('timeZone').includes(timezone))) throw invalid('timezone');
+    const zone = timezone === undefined ? null : canonicalTimeZone(timezone);
+    if (timezone !== undefined && !zone) throw invalid('timezone');
     const data = await this.client.request({
       method: 'GET', path: `/calendars/${calendarId}/free-slots`, version: GHL_VERSION.calendars,
-      query: { startDate: String(start), endDate: String(end + DAY_MS - 1), ...(timezone ? { timezone: timezone as string } : {}) },
+      query: { startDate: String(start), endDate: String(end + DAY_MS - 1), ...(zone ? { timezone: zone } : {}) },
     });
     const days = Object.entries(data)
       .filter(([date, value]) => DATE.test(date) && isRecord(value) && Array.isArray(value.slots))
       .map(([date, value]) => ({ date, slots: ((value as { slots: unknown[] }).slots).filter((slot): slot is string => typeof slot === 'string') }))
       .sort((a, b) => a.date.localeCompare(b.date));
-    return { calendarId, timezone: (timezone as string | undefined) ?? null, days };
+    return { calendarId, timezone: zone, days };
   }
 }
