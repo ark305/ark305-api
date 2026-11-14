@@ -1,10 +1,28 @@
 import { Injectable, ServiceUnavailableException } from '@nestjs/common';
 import { getSupabaseConfig } from '../identity/supabase-config.js';
-import { ProfileInput, ProfileRecord, ProfilesPort, ServiceInput, ServiceRecord } from './profiles.port.js';
+import {
+  ProfileInput, ProfileRecord, ProfilesPort, ProviderApplication, ProviderApplicationStatus, ServiceInput, ServiceRecord,
+} from './profiles.port.js';
 
 const PRIVATE_COLUMNS = 'id,handle,name,kind,role,area,tagline,photo_url,banner_url,gallery,instagram,tiktok,facebook,bio_link,shared,experience,taste,diagnosis';
 const PUBLIC_COLUMNS = 'id,handle,name,kind,role,area,tagline,photo_url,banner_url,gallery,instagram,tiktok,facebook,bio_link,shared';
 const SERVICE_COLUMNS = 'id,owner,title,kicker,detail,price,action,photo_url,position';
+const APPLICATION_COLUMNS = 'user_id,status,requested_at,decided_at';
+const APPLICATION_STATUSES = ['pending', 'approved', 'rejected'];
+
+type ApplicationRow = { user_id?: unknown; status?: unknown; requested_at?: unknown; decided_at?: unknown; profile?: unknown };
+
+function toApplication(row: ApplicationRow): ProviderApplication {
+  if (typeof row.user_id !== 'string' || !APPLICATION_STATUSES.includes(String(row.status)) || typeof row.requested_at !== 'string'
+    || (row.decided_at !== null && typeof row.decided_at !== 'string')) {
+    throw new ServiceUnavailableException('Profile storage unavailable');
+  }
+  const profile = row.profile && typeof row.profile === 'object' ? row.profile as Record<string, unknown> : null;
+  return {
+    userId: row.user_id, status: row.status as ProviderApplicationStatus, requestedAt: row.requested_at, decidedAt: row.decided_at,
+    ...('profile' in row ? { profile: profile ? { handle: String(profile.handle), name: String(profile.name), kind: String(profile.kind) } : null } : {}),
+  };
+}
 
 @Injectable()
 export class SupabaseProfilesAdapter extends ProfilesPort {
@@ -53,6 +71,35 @@ export class SupabaseProfilesAdapter extends ProfilesPort {
   async updateOwn(token: string, ownerId: string, value: ProfileInput) {
     const rows = await this.write<ProfileRecord>('profiles', token, 'PATCH', value, { id: `eq.${ownerId}` }, 'id');
     return rows[0]?.id === ownerId;
+  }
+
+  async isOperator(token: string, userId: string) {
+    const rows = await this.list<{ user_id?: unknown }>('request_administrators', token, 'user_id', { user_id: `eq.${userId}`, limit: '2' });
+    if (rows.length > 1 || (rows.length === 1 && rows[0].user_id !== userId)) throw new ServiceUnavailableException('Profile storage unavailable');
+    return rows.length === 1;
+  }
+
+  async findProviderApplication(token: string, userId: string) {
+    const row = await this.single<ApplicationRow>('provider_applications', token, APPLICATION_COLUMNS, { user_id: `eq.${userId}`, limit: '1' });
+    return row ? toApplication(row) : null;
+  }
+
+  async requestProviderRole(token: string) {
+    const rows = await this.write<ApplicationRow>('rpc/request_provider_role', token, 'POST', {}, {}, APPLICATION_COLUMNS);
+    if (rows.length > 1) throw new ServiceUnavailableException('Profile storage unavailable');
+    return rows[0] ? toApplication(rows[0]) : null;
+  }
+
+  async listProviderApplications(token: string, status: ProviderApplicationStatus) {
+    const rows = await this.list<ApplicationRow>('provider_applications', token, `${APPLICATION_COLUMNS},profile:profiles(handle,name,kind)`,
+      { status: `eq.${status}`, order: status === 'pending' ? 'requested_at.asc' : 'decided_at.desc', limit: '100' });
+    return rows.map(toApplication);
+  }
+
+  async decideProviderApplication(token: string, applicantId: string, approve: boolean) {
+    const rows = await this.write<ApplicationRow>('rpc/decide_provider_application', token, 'POST', { applicant: applicantId, approve }, {}, APPLICATION_COLUMNS);
+    if (rows.length > 1) throw new ServiceUnavailableException('Profile storage unavailable');
+    return rows[0] ? toApplication(rows[0]) : null;
   }
 
   private async single<T>(table: string, token: string, columns: string, search: Record<string, string>): Promise<T | null> {
