@@ -7,7 +7,10 @@ El módulo Nest centraliza las escrituras y lecturas de perfiles, servicios, pre
 | Ruta | Acceso | Propósito |
 |---|---|---|
 | `GET /api/v1/profiles/me` | Bearer de usuario | Perfil privado propio y servicios propios |
-| `POST/PATCH /api/v1/profiles/me` | Bearer de usuario | Crear o actualizar el perfil autenticado |
+| `POST/PATCH /api/v1/profiles/me` | Bearer de usuario | Crear o actualizar el perfil autenticado. `kind: "provider"` no se aplica directamente: abre una solicitud de aprobación |
+| `GET/POST /api/v1/profiles/me/provider-application` | Bearer de usuario | Ver o abrir la solicitud propia para ser proveedor |
+| `GET /api/v1/profiles/provider-applications?status=pending` | Operador | Listar solicitudes de proveedor |
+| `POST /api/v1/profiles/provider-applications/:userId/approve\|reject` | Operador | Aprobar o rechazar una solicitud pendiente |
 | `GET /api/v1/profiles/check-handle?handle=` | Bearer de usuario | Validar disponibilidad excluyendo al usuario actual |
 | `POST /api/v1/profiles/me/services` | Bearer de usuario | Crear un servicio con propietario verificado |
 | `PATCH/DELETE /api/v1/profiles/me/services/:id` | Bearer de usuario | Modificar o borrar solo servicios propios |
@@ -21,6 +24,8 @@ El módulo Nest centraliza las escrituras y lecturas de perfiles, servicios, pre
 ## Seguridad
 
 Las rutas privadas usan `IdentityGuard` y reenvían a Supabase el JWT del usuario junto con la clave publicable; nunca usan `service_role`. Las escrituras filtran por el ID verificado y las consultas de servicios por `owner`. Las respuestas públicas usan una lista positiva de campos. Auth y Storage continúan en los adaptadores web.
+
+Solo un operador (`request_administrators`) puede convertir un perfil en `provider`; ver [aprobación de proveedores](PROVIDER_APPROVAL.md).
 
 ## Integración web
 

@@ -7,6 +7,7 @@ import { parseSide, sideToExperience } from '../../domain/mode.js';
 import { AuthenticatedRequest } from '../identity/identity.guard.js';
 import { Public } from '../identity/public.decorator.js';
 import { ProfileInput, ProfilesPort, ServiceInput } from './profiles.port.js';
+import { ProviderApprovalService } from './provider-approval.service.js';
 
 const HANDLE = /^[a-z0-9._]{3,30}$/;
 const RESERVED = new Set(['admin', 'ark', 'arkai', 'soporte', 'support', 'perfil', 'private', 'lente305', 'bluewater', 'chefadri', 'valentinar', 'skyview', 'noches305', 'danielm', 'aeroframe', 'miamiblackcar', 'camila.edita', 'mateo.cm', 'casalimpia', 'clipkitchen', 'handy305', 'mesa305', 'sunsetcharters', 'ark305', 'bayfrontprivate', 'studiomarfil', 'atlasaviation', 'oceanfleet']);
@@ -81,7 +82,7 @@ function validateService(input: unknown, ownerId: string): ServiceInput {
 
 @Controller('profiles')
 export class ProfilesController {
-  constructor(private readonly profiles: ProfilesPort) {}
+  constructor(private readonly profiles: ProfilesPort, private readonly approvals: ProviderApprovalService) {}
 
   @Post('snapshot') @Public() @HttpCode(200) @Header('Cache-Control', 'no-store')
   snapshot(@Body() body: unknown) {
@@ -112,18 +113,40 @@ export class ProfilesController {
   async createProfile(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
     const token = accessToken(request); const ownerId = request.principal!.id; const value = validateProfile(body, ownerId, true);
     if (await this.profiles.handleTaken(token, String(value.handle))) throw invalid('handle');
-    const profile = await this.profiles.createProfile(token, ownerId, { ...value, id: ownerId });
+    const gate = this.approvals.gateKind(value, null);
+    const profile = await this.profiles.createProfile(token, ownerId, { ...gate.value, id: ownerId });
     if (!profile) throw new BadRequestException('Profile was not created');
-    return profile;
+    return gate.requested ? { ...profile, providerApplication: await this.approvals.apply(token, ownerId) } : profile;
   }
 
   @Patch('me') @Header('Cache-Control', 'no-store')
   async updateProfile(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
     const token = accessToken(request); const ownerId = request.principal!.id; const value = validateProfile(body, ownerId, false);
     if (await this.profiles.handleTaken(token, String(value.handle), ownerId)) throw invalid('handle');
-    const profile = await this.profiles.updateProfile(token, ownerId, value);
+    const gate = this.approvals.gateKind(value, (await this.profiles.findOwn(token, ownerId))?.kind);
+    const profile = await this.profiles.updateProfile(token, ownerId, gate.value);
     if (!profile) throw new BadRequestException('Profile was not updated');
-    return profile;
+    return gate.requested ? { ...profile, providerApplication: await this.approvals.apply(token, ownerId) } : profile;
+  }
+
+  @Get('me/provider-application') @Header('Cache-Control', 'no-store')
+  async providerApplication(@Req() request: AuthenticatedRequest) {
+    return { application: await this.profiles.findProviderApplication(accessToken(request), request.principal!.id) };
+  }
+
+  @Post('me/provider-application') @HttpCode(200) @Header('Cache-Control', 'no-store')
+  async applyAsProvider(@Req() request: AuthenticatedRequest) {
+    return { application: await this.approvals.apply(accessToken(request), request.principal!.id) };
+  }
+
+  @Get('provider-applications') @Header('Cache-Control', 'no-store')
+  async providerApplications(@Req() request: AuthenticatedRequest, @Query('status') status?: string) {
+    return { items: await this.approvals.list(accessToken(request), request.principal!.id, status) };
+  }
+
+  @Post('provider-applications/:userId/:decision') @HttpCode(200) @Header('Cache-Control', 'no-store')
+  async decideProviderApplication(@Req() request: AuthenticatedRequest, @Param('userId') userId: string, @Param('decision') decision: string) {
+    return { application: await this.approvals.decide(accessToken(request), request.principal!.id, userId, decision) };
   }
 
   @Post('me/services') @Header('Cache-Control', 'no-store')
