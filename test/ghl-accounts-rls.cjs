@@ -48,11 +48,15 @@ async function main() {
 
     run(`${as(provider)} ${insert(provider)}`);
     run(`${as(member)} ${insert(member)}`, false);
+    assert.match(run(`${as(provider)} insert into public.ghl_provider_accounts (provider_id, location_id, token_ciphertext) values ('${provider}', 'provLoc', '${SEALED}')
+      on conflict (provider_id) do update set token_ciphertext = excluded.token_ciphertext;`, false), /permission denied/);
+    assert.equal(run(`${as(provider)} update public.ghl_provider_accounts set location_id = 'provLoc', token_ciphertext = '${SEALED}'
+      where provider_id = '${provider}' returning provider_id, location_id;`), `${provider}|provLoc`);
     run(`${as(provider)} ${insert(customer)}`, false);
     run(`${as(provider)} ${insert(provider, 'bad id')}`, false);
     run(`${as(provider)} insert into public.ghl_provider_accounts (provider_id, location_id, token_ciphertext) values ('${provider}', 'x', 'plain-token');`, false);
     run(`${as(provider)} insert into public.ghl_provider_accounts (provider_id, location_id, token_ciphertext, connected_at) values ('${provider}', 'x', '${SEALED}', now());`, false);
-    pass('only an approved provider can store their own account, and only as a sealed value');
+    pass('only an approved provider can store their own account, only sealed; reconnecting is an update (upsert cannot read the token)');
 
     assert.match(run(`${as(provider)} select token_ciphertext from public.ghl_provider_accounts;`, false), /permission denied/);
     assert.match(run(`${as(operator)} select * from public.ghl_provider_accounts;`, false), /permission denied/);

@@ -208,7 +208,20 @@ test('GHL account routes: connect, status, operator view, acting for a provider 
     }
     if (url.pathname === '/rest/v1/ghl_provider_accounts') {
       const view = ({ token_ciphertext, ...row }) => row;
-      if (req.method === 'POST') { const row = { ...JSON.parse(raw), connected_at: '2027-01-01T00:00:00Z', updated_at: '2027-01-01T00:00:00Z' }; rows.set(row.provider_id, row); return res.end(JSON.stringify([view(row)])); }
+      if (req.method === 'PATCH' || req.method === 'POST') {
+        assert.ok(!url.searchParams.has('on_conflict'), 'upserts need SELECT on token_ciphertext');
+        assert.equal(url.searchParams.get('select'), 'provider_id,location_id,pipeline_id,pipeline_stage_id,connected_at,updated_at');
+      }
+      if (req.method === 'PATCH') {
+        const row = rows.get(url.searchParams.get('provider_id').slice(3));
+        if (row) Object.assign(row, JSON.parse(raw), { updated_at: '2027-01-02T00:00:00Z' });
+        return res.end(JSON.stringify(row ? [view(row)] : []));
+      }
+      if (req.method === 'POST') {
+        const row = { ...JSON.parse(raw), connected_at: '2027-01-01T00:00:00Z', updated_at: '2027-01-01T00:00:00Z' };
+        if (rows.has(row.provider_id)) { res.statusCode = 409; return res.end('{}'); }
+        rows.set(row.provider_id, row); return res.end(JSON.stringify([view(row)]));
+      }
       if (req.method === 'DELETE') { rows.delete(url.searchParams.get('provider_id').slice(3)); res.statusCode = 204; return res.end(); }
       const id = url.searchParams.get('provider_id')?.slice(3);
       return res.end(JSON.stringify([...rows.values()].filter(row => !id || row.provider_id === id).map(view)));
@@ -250,6 +263,10 @@ test('GHL account routes: connect, status, operator view, acting for a provider 
     connectedAt: '2027-01-01T00:00:00Z', updatedAt: '2027-01-01T00:00:00Z' });
   assert.ok(!rows.get(provider).token_ciphertext.includes(PIT));
   assert.equal((await call('/account', { token: 'provider' })).json.locationId, 'provLoc');
+  const firstCiphertext = rows.get(provider).token_ciphertext;
+  const reconnected = await call('/account', { method: 'PUT', body: { locationId: 'provLoc', token: PIT, pipelineId: 'provPipe' }, token: 'provider' });
+  assert.deepEqual([reconnected.status, reconnected.json.updatedAt, rows.size], [200, '2027-01-02T00:00:00Z', 1]);
+  assert.notEqual(rows.get(provider).token_ciphertext, firstCiphertext);
 
   assert.equal((await call('/accounts', { token: 'customer' })).status, 403);
   assert.deepEqual((await call('/accounts', { token: 'operator' })).json.items.map(item => item.providerId), [provider]);
