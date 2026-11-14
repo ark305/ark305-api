@@ -5,6 +5,7 @@ import { IdentityModule } from './modules/identity/identity.module.js';
 import { RequestsModule } from './modules/requests/requests.module.js';
 import { AiModule } from './modules/ai/ai.module.js';
 import { ProfilesModule } from './modules/profiles/profiles.module.js';
+import { GhlModule } from './modules/ghl/ghl.module.js';
 
-@Module({ imports: [IdentityModule, HealthModule, CatalogModule, RequestsModule, AiModule, ProfilesModule] })
+@Module({ imports: [IdentityModule, HealthModule, CatalogModule, RequestsModule, AiModule, ProfilesModule, GhlModule] })
 export class AppModule {}
