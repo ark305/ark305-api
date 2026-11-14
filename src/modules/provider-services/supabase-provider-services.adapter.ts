@@ -36,30 +36,30 @@ function rowsOf(value: unknown, max: number): ProviderService[] {
 @Injectable()
 export class SupabaseProviderServicesAdapter extends ProviderServicesPort {
   async create(token: string, providerId: string, fields: ServiceFields): Promise<ProviderService> {
-    const rows = rowsOf(await this.request(token, 'POST', 'services', { select: COLUMNS }, { provider_id: providerId, ...columns(fields) }, 'return=representation'), 1);
+    const rows = rowsOf(await this.request(token, 'POST', 'provider_services', { select: COLUMNS }, { provider_id: providerId, ...columns(fields) }, 'return=representation'), 1);
     if (rows.length !== 1) throw serviceUnavailable();
     return rows[0];
   }
 
   async update(token: string, providerId: string, id: string, fields: Partial<ServiceFields>): Promise<ProviderService | null> {
-    const rows = rowsOf(await this.request(token, 'PATCH', 'services', { select: COLUMNS, id: `eq.${id}`, provider_id: `eq.${providerId}` },
+    const rows = rowsOf(await this.request(token, 'PATCH', 'provider_services', { select: COLUMNS, id: `eq.${id}`, provider_id: `eq.${providerId}` },
       columns(fields), 'return=representation'), 1);
     return rows[0] ?? null;
   }
 
   async findById(token: string, id: string): Promise<ProviderService | null> {
-    return rowsOf(await this.request(token, 'GET', 'services', { select: COLUMNS, id: `eq.${id}`, limit: '2' }), 1)[0] ?? null;
+    return rowsOf(await this.request(token, 'GET', 'provider_services', { select: COLUMNS, id: `eq.${id}`, limit: '2' }), 1)[0] ?? null;
   }
 
   async search(token: string, search: ServiceSearch): Promise<ProviderService[]> {
-    return rowsOf(await this.request(token, 'POST', 'rpc/search_services', { select: COLUMNS }, {
+    return rowsOf(await this.request(token, 'POST', 'rpc/search_provider_services', { select: COLUMNS }, {
       search_text: search.text ?? null, search_category: search.category ?? null, search_provider: search.providerId ?? null,
       result_limit: search.limit, result_offset: search.offset,
     }), search.limit);
   }
 
   async listOwn(token: string, providerId: string): Promise<ProviderService[]> {
-    return rowsOf(await this.request(token, 'GET', 'services', { select: COLUMNS, provider_id: `eq.${providerId}`,
+    return rowsOf(await this.request(token, 'GET', 'provider_services', { select: COLUMNS, provider_id: `eq.${providerId}`,
       order: 'updated_at.desc,id.asc', limit: String(MAX_OWN) }), MAX_OWN);
   }
 
@@ -85,7 +85,7 @@ export class SupabaseProviderServicesAdapter extends ProviderServicesPort {
       throw serviceUnavailable();
     }
     // RLS rejects writes from callers without an approved provider profile; PostgREST reports that as 403.
-    if (response.status === 403 && path === 'services' && method !== 'GET') throw new ForbiddenException('Provider profile required');
+    if (response.status === 403 && path === 'provider_services' && method !== 'GET') throw new ForbiddenException('Provider profile required');
     if (!response.ok) throw serviceUnavailable();
     try { return await response.json(); } catch { throw serviceUnavailable(); }
   }

@@ -1,7 +1,7 @@
--- Services each approved provider publishes. Only the owner writes their rows (owner = auth.uid(), never client-chosen);
+-- Services each approved provider publishes (public.services in schema.sql is the profiles module's service cards). Only the owner writes their rows (owner = auth.uid(), never client-chosen);
 -- everyone signed in reads active services of current providers. Services are deactivated, never deleted, so
 -- requests and orders that reference them keep resolving.
-create table public.services (
+create table public.provider_services (
   id uuid primary key default gen_random_uuid(),
   provider_id uuid not null references public.profiles(id) on delete cascade,
   name text not null check (char_length(name) between 1 and 120 and name = btrim(name)),
@@ -14,27 +14,27 @@ create table public.services (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-create index services_provider_idx on public.services (provider_id, updated_at desc);
-create index services_active_category_idx on public.services (category, updated_at desc) where active;
+create index provider_services_provider_idx on public.provider_services (provider_id, updated_at desc);
+create index provider_services_active_category_idx on public.provider_services (category, updated_at desc) where active;
 
-alter table public.services enable row level security;
-revoke all on public.services from public, anon, authenticated;
-grant select on public.services to authenticated;
-grant insert (provider_id, name, description, price_cents, currency, duration_minutes, category, active) on public.services to authenticated;
-grant update (name, description, price_cents, currency, duration_minutes, category, active) on public.services to authenticated;
+alter table public.provider_services enable row level security;
+revoke all on public.provider_services from public, anon, authenticated;
+grant select on public.provider_services to authenticated;
+grant insert (provider_id, name, description, price_cents, currency, duration_minutes, category, active) on public.provider_services to authenticated;
+grant update (name, description, price_cents, currency, duration_minutes, category, active) on public.provider_services to authenticated;
 
-create policy services_read_active_or_own on public.services
+create policy provider_services_read_active_or_own on public.provider_services
   for select to authenticated using (
     provider_id = (select auth.uid())
     or (active and exists (select 1 from public.profiles p where p.id = provider_id and p.kind = 'provider'))
   );
-create policy services_insert_own_provider on public.services
+create policy provider_services_insert_own_provider on public.provider_services
   for insert to authenticated with check (
     provider_id = (select auth.uid())
     and exists (select 1 from public.profiles p where p.id = provider_id and p.kind = 'provider')
   );
 -- A provider who lost the provider kind can still deactivate their services, but cannot reactivate them.
-create policy services_update_own on public.services
+create policy provider_services_update_own on public.provider_services
   for update to authenticated using (provider_id = (select auth.uid())) with check (
     provider_id = (select auth.uid())
     and (not active or exists (select 1 from public.profiles p where p.id = provider_id and p.kind = 'provider'))
@@ -56,20 +56,20 @@ begin
 end;
 $$;
 revoke all on function services_private.stamp_service() from public, anon, authenticated;
-create trigger services_stamp
-  before insert or update on public.services
+create trigger provider_services_stamp
+  before insert or update on public.provider_services
   for each row execute function services_private.stamp_service();
 
 -- Public search: active services of current providers, filtered by category, provider and/or text
 -- (case-insensitive substring of name or description; LIKE wildcards in the text are matched literally).
 -- Runs as the caller, so the RLS above still applies.
-create function public.search_services(
+create function public.search_provider_services(
   search_text text default null, search_category text default null, search_provider uuid default null,
   result_limit integer default 50, result_offset integer default 0)
-  returns setof public.services
+  returns setof public.provider_services
   language sql stable security invoker set search_path = '' as $$
   select s.*
-  from public.services s
+  from public.provider_services s
   where s.active
     and exists (select 1 from public.profiles p where p.id = s.provider_id and p.kind = 'provider')
     and (search_category is null or s.category = search_category)
@@ -81,5 +81,5 @@ create function public.search_services(
   limit least(greatest(coalesce(result_limit, 50), 1), 100)
   offset least(greatest(coalesce(result_offset, 0), 0), 10000);
 $$;
-revoke all on function public.search_services(text, text, uuid, integer, integer) from public, anon, authenticated;
-grant execute on function public.search_services(text, text, uuid, integer, integer) to authenticated;
+revoke all on function public.search_provider_services(text, text, uuid, integer, integer) from public, anon, authenticated;
+grant execute on function public.search_provider_services(text, text, uuid, integer, integer) to authenticated;

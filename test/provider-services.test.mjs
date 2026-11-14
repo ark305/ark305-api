@@ -102,7 +102,7 @@ test('public lists never include inactive services; detail hides inactive ones f
 
 test('migration: owner-only writes, no owner/timestamp/delete grants, active-only public search', () => {
   const sql = fs.readFileSync(new URL('../supabase/migrations/20261114040000_provider_services.sql', import.meta.url), 'utf8');
-  for (const invariant of [/enable row level security/i, /revoke all on public\.services from public, anon, authenticated/i,
+  for (const invariant of [/enable row level security/i, /revoke all on public\.provider_services from public, anon, authenticated/i,
     /price_cents integer not null check \(price_cents between 0 and 100000000\)/i, /duration_minutes integer not null check \(duration_minutes between 1 and 43200\)/i,
     /security invoker set search_path = ''/i, /where s\.active/i]) assert.match(sql, invariant);
   assert.doesNotMatch(sql.match(/grant update \(([^)]*)\)/i)[1], /provider_id|created_at|updated_at|id,/);
@@ -128,13 +128,13 @@ test('services routes over HTTP: auth required, owner from JWT, fixed 503 on sto
     if (failing) { res.statusCode = 500; return res.end('{"message":"relation secret_table does not exist","details":"internal"}'); }
     const dbRow = { id: serviceId, provider_id: provider, name: 'Yate', description: '', price_cents: 100, currency: 'USD', duration_minutes: 60,
       category: 'water', active: true, created_at: '2027-01-01T00:00:00Z', updated_at: '2027-01-01T00:00:00Z' };
-    if (req.method === 'POST' && url.pathname === '/rest/v1/services') {
+    if (req.method === 'POST' && url.pathname === '/rest/v1/provider_services') {
       const body = JSON.parse(raw);
       if (body.provider_id !== provider) { res.statusCode = 403; return res.end('{}'); }
       return res.end(JSON.stringify([{ ...dbRow, ...body }]));
     }
     if (req.method === 'PATCH') return res.end(JSON.stringify(url.searchParams.get('provider_id') === `eq.${provider}` ? [{ ...dbRow, ...JSON.parse(raw) }] : []));
-    if (url.pathname === '/rest/v1/rpc/search_services') return res.end(JSON.stringify([dbRow]));
+    if (url.pathname === '/rest/v1/rpc/search_provider_services') return res.end(JSON.stringify([dbRow]));
     return res.end(JSON.stringify([dbRow]));
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));

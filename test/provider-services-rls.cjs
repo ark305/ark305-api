@@ -17,8 +17,8 @@ const run = (script, ok = true) => {
 };
 const as = (id, role = 'authenticated') => `set role ${role}; set request.jwt.claims = '${JSON.stringify(id ? { sub: id, role } : { role })}';`;
 const insert = (owner, values = `'Yate', 150000, 240, 'water'`) =>
-  `insert into public.services (provider_id, name, price_cents, duration_minutes, category) values ('${owner}', ${values}) returning id;`;
-const search = (args = '') => `select coalesce(string_agg(name, ',' order by name), '') from public.search_services(${args});`;
+  `insert into public.provider_services (provider_id, name, price_cents, duration_minutes, category) values ('${owner}', ${values}) returning id;`;
+const search = (args = '') => `select coalesce(string_agg(name, ',' order by name), '') from public.search_provider_services(${args});`;
 const pass = label => process.stdout.write(`PASS ${label}\n`);
 
 async function main() {
@@ -40,6 +40,7 @@ async function main() {
       alter table public.profiles enable row level security;
       create policy profiles_read on public.profiles for select using (true);
       grant select on public.profiles to anon, authenticated;
+      create table public.services (id uuid primary key, owner uuid references public.profiles(id), title text not null);
       insert into public.profiles values ('${provider}', 'provider'), ('${member}', 'member'), ('${customer}', 'member'), ('${second}', 'provider');`);
     run(migration);
 
@@ -51,16 +52,16 @@ async function main() {
     for (const values of [`'Yate', -1, 60, 'water'`, `'Yate', 1, 0, 'water'`, `'', 1, 60, 'water'`, `' Yate', 1, 60, 'water'`, `'Yate', 1, 60, 'weapons'`]) {
       run(`${as(provider)} ${insert(provider, values)}`, false);
     }
-    run(`${as(provider)} insert into public.services (provider_id, name, price_cents, duration_minutes, category, created_at) values ('${provider}', 'x', 1, 1, 'water', now());`, false);
-    assert.match(run(`${as(null, 'anon')} select count(*) from public.services;`, false), /permission denied/);
+    run(`${as(provider)} insert into public.provider_services (provider_id, name, price_cents, duration_minutes, category, created_at) values ('${provider}', 'x', 1, 1, 'water', now());`, false);
+    assert.match(run(`${as(null, 'anon')} select count(*) from public.provider_services;`, false), /permission denied/);
     pass('only approved providers insert, only as themselves, and the table checks hold');
 
-    assert.equal(run(`${as(customer)} update public.services set price_cents = 1 returning 1;`), '');
-    assert.equal(run(`${as(second)} update public.services set active = false where id = '${yacht}' returning 1;`), '');
-    run(`${as(provider)} update public.services set provider_id = '${second}' where id = '${yacht}';`, false);
-    run(`${as(provider)} delete from public.services where id = '${yacht}';`, false);
-    run(`${as(provider)} update public.services set price_cents = 160000, description = 'Sandbar' where id = '${yacht}';`);
-    assert.equal(run(`select provider_id || ':' || price_cents || ':' || (updated_at >= created_at) from public.services where id = '${yacht}';`), `${provider}:160000:true`);
+    assert.equal(run(`${as(customer)} update public.provider_services set price_cents = 1 returning 1;`), '');
+    assert.equal(run(`${as(second)} update public.provider_services set active = false where id = '${yacht}' returning 1;`), '');
+    run(`${as(provider)} update public.provider_services set provider_id = '${second}' where id = '${yacht}';`, false);
+    run(`${as(provider)} delete from public.provider_services where id = '${yacht}';`, false);
+    run(`${as(provider)} update public.provider_services set price_cents = 160000, description = 'Sandbar' where id = '${yacht}';`);
+    assert.equal(run(`select provider_id || ':' || price_cents || ':' || (updated_at >= created_at) from public.provider_services where id = '${yacht}';`), `${provider}:160000:true`);
     pass('only the owner updates; owner cannot change and nothing can be deleted');
 
     assert.equal(run(`${as(customer)} ${search()}`), 'Chef privado,Yate');
@@ -72,15 +73,15 @@ async function main() {
     assert.match(run(`${as(null, 'anon')} ${search()}`, false), /permission denied/);
     pass('search filters by category, provider and literal text');
 
-    run(`${as(provider)} update public.services set active = false where id = '${yacht}';`);
+    run(`${as(provider)} update public.provider_services set active = false where id = '${yacht}';`);
     assert.equal(run(`${as(customer)} ${search()}`), 'Chef privado');
-    assert.equal(run(`${as(customer)} select count(*) from public.services where id = '${yacht}';`), '0');
-    assert.equal(run(`${as(provider)} select count(*) from public.services where id = '${yacht}';`), '1');
+    assert.equal(run(`${as(customer)} select count(*) from public.provider_services where id = '${yacht}';`), '0');
+    assert.equal(run(`${as(provider)} select count(*) from public.provider_services where id = '${yacht}';`), '1');
     run(`update public.profiles set kind = 'member' where id = '${second}';`);
     assert.equal(run(`${as(customer)} ${search()}`), '');
-    assert.equal(run(`${as(customer)} select count(*) from public.services;`), '0');
-    run(`${as(second)} update public.services set active = true;`, false);
-    run(`${as(second)} update public.services set active = false;`);
+    assert.equal(run(`${as(customer)} select count(*) from public.provider_services;`), '0');
+    run(`${as(second)} update public.provider_services set active = true;`, false);
+    run(`${as(second)} update public.provider_services set active = false;`);
     pass('inactive services and demoted providers drop out of public reads; owners still see theirs and can deactivate');
   } finally {
     docker(['rm', '--force', '--volumes', name]);
