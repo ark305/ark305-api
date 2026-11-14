@@ -24,7 +24,7 @@ function fakePort(overrides = {}) {
     async update(token, providerId, id, fields) { calls.push(['update', providerId, id, fields]); return row({ id, providerId, ...fields }); },
     async findById(token, id) { calls.push(['findById', id]); return row({ id }); },
     async search(token, search) { calls.push(['search', search]); return [row()]; },
-    async listOwn(token, providerId) { calls.push(['listOwn', providerId]); return [row({ providerId, active: false })]; },
+    async listOwn(token, providerId, page) { calls.push(['listOwn', providerId, page]); return [row({ providerId, active: false })]; },
     ...overrides,
   };
 }
@@ -95,9 +95,15 @@ test('public lists never include inactive services; detail hides inactive ones f
   await assert.rejects(none.findById('tok', other, serviceId), status(404));
   const tooMany = new ProviderServicesService(fakePort({ async search() { return [row(), row()]; } }));
   await assert.rejects(tooMany.search('tok', { limit: '1' }), status(503));
-  assert.equal((await service.listOwn('tok', provider)).items[0].active, false);
+  const own = fakePort(); const owner = new ProviderServicesService(own);
+  assert.equal((await owner.listOwn('tok', provider, {})).items[0].active, false);
+  assert.deepEqual(own.calls.at(-1), ['listOwn', provider, { limit: 50, offset: 0 }]);
+  assert.deepEqual((await owner.listOwn('tok', provider, { limit: '100', offset: '200' })), { items: [row({ active: false })], limit: 100, offset: 200 });
+  for (const query of [{ q: 'x' }, { category: 'water' }, { limit: '101' }, { offset: '-1' }]) await assert.rejects(owner.listOwn('tok', provider, query), status(400));
   const leaky = new ProviderServicesService(fakePort({ async listOwn() { return [row({ providerId: other })]; } }));
-  await assert.rejects(leaky.listOwn('tok', provider), status(503));
+  await assert.rejects(leaky.listOwn('tok', provider, {}), status(503));
+  const overfull = new ProviderServicesService(fakePort({ async listOwn() { return [row(), row()]; } }));
+  await assert.rejects(overfull.listOwn('tok', provider, { limit: '1' }), status(503));
 });
 
 test('migration: owner-only writes, no owner/timestamp/delete grants, active-only public search', () => {
@@ -178,8 +184,8 @@ test('services routes over HTTP: auth required, owner from JWT, fixed 503 on sto
   assert.equal((await call('?active=false', { token: 'customer' })).status, 400);
   assert.equal((await call(`/${serviceId}`, { token: 'customer' })).json.id, serviceId);
   assert.equal((await call('/not-a-uuid', { token: 'customer' })).status, 400);
-  assert.equal((await call('/mine', { token: 'provider' })).json.items[0].providerId, provider);
-  assert.equal(seen.at(-1).query.provider_id, `eq.${provider}`);
+  assert.equal((await call('/mine?limit=10&offset=20', { token: 'provider' })).json.items[0].providerId, provider);
+  assert.deepEqual([seen.at(-1).query.provider_id, seen.at(-1).query.limit, seen.at(-1).query.offset], [`eq.${provider}`, '10', '20']);
 
   failing = true;
   for (const [path, method, body] of [['', 'GET'], [`/${serviceId}`, 'GET'], ['', 'POST', create], [`/${serviceId}`, 'PATCH', { active: true }]]) {

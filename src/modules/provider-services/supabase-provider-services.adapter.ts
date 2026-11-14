@@ -1,10 +1,9 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
 import { getSupabaseConfig } from '../identity/supabase-config.js';
-import { ProviderService, ProviderServicesPort, SERVICE_CATEGORIES, ServiceFields, ServiceSearch } from './provider-services.port.js';
+import { Page, ProviderService, ProviderServicesPort, SERVICE_CATEGORIES, ServiceFields, ServiceSearch } from './provider-services.port.js';
 import { serviceUnavailable } from './provider-services.service.js';
 
 const COLUMNS = 'id,provider_id,name,description,price_cents,currency,duration_minutes,category,active,created_at,updated_at';
-const MAX_OWN = 200;
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
 const timestamp = (value: unknown): value is string => typeof value === 'string' && !Number.isNaN(Date.parse(value));
@@ -58,9 +57,9 @@ export class SupabaseProviderServicesAdapter extends ProviderServicesPort {
     }), search.limit);
   }
 
-  async listOwn(token: string, providerId: string): Promise<ProviderService[]> {
+  async listOwn(token: string, providerId: string, page: Page): Promise<ProviderService[]> {
     return rowsOf(await this.request(token, 'GET', 'provider_services', { select: COLUMNS, provider_id: `eq.${providerId}`,
-      order: 'updated_at.desc,id.asc', limit: String(MAX_OWN) }), MAX_OWN);
+      order: 'updated_at.desc,id.asc', limit: String(page.limit), offset: String(page.offset) }), page.limit);
   }
 
   private async request(token: string, method: 'GET' | 'POST' | 'PATCH', path: string, search: Record<string, string>, body?: unknown, prefer?: string): Promise<unknown> {

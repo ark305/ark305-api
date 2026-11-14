@@ -20,8 +20,8 @@ export class ProviderServicesController {
   }
 
   @Get('mine') @Header('Cache-Control', 'no-store')
-  mine(@Req() request: AuthenticatedRequest) {
-    return this.services.listOwn(accessToken(request), request.principal!.id);
+  mine(@Req() request: AuthenticatedRequest, @Query() query: unknown) {
+    return this.services.listOwn(accessToken(request), request.principal!.id, query);
   }
 
   @Get(':id') @Header('Cache-Control', 'no-store')

@@ -16,7 +16,8 @@ export type ProviderService = {
 };
 
 export type ServiceFields = Pick<ProviderService, 'name' | 'description' | 'priceCents' | 'currency' | 'durationMinutes' | 'category' | 'active'>;
-export type ServiceSearch = { text?: string; category?: ServiceCategory; providerId?: string; limit: number; offset: number };
+export type Page = { limit: number; offset: number };
+export type ServiceSearch = Page & { text?: string; category?: ServiceCategory; providerId?: string };
 
 export abstract class ProviderServicesPort {
   abstract create(token: string, providerId: string, fields: ServiceFields): Promise<ProviderService>;
@@ -25,5 +26,5 @@ export abstract class ProviderServicesPort {
   abstract findById(token: string, id: string): Promise<ProviderService | null>;
   /** Active services of current providers only. */
   abstract search(token: string, search: ServiceSearch): Promise<ProviderService[]>;
-  abstract listOwn(token: string, providerId: string): Promise<ProviderService[]>;
+  abstract listOwn(token: string, providerId: string, page: Page): Promise<ProviderService[]>;
 }

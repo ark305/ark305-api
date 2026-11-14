@@ -1,5 +1,5 @@
 import { BadRequestException, Injectable, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
-import { ProviderService, ProviderServicesPort, SERVICE_CATEGORIES, ServiceCategory, ServiceFields, ServiceSearch } from './provider-services.port.js';
+import { Page, ProviderService, ProviderServicesPort, SERVICE_CATEGORIES, ServiceCategory, ServiceFields, ServiceSearch } from './provider-services.port.js';
 
 export const LIMITS = { name: 120, description: 2000, priceCents: 100_000_000, durationMinutes: 43_200, query: 100, pageSize: 100, offset: 10_000 } as const;
 const DEFAULT_PAGE_SIZE = 50;
@@ -86,6 +86,12 @@ export function parseServiceSearch(query: unknown): ServiceSearch {
   return search;
 }
 
+export function parseOwnPage(query: unknown): Page {
+  if (!isRecord(query) || Object.keys(query).some(key => key !== 'limit' && key !== 'offset')) throw invalid('page');
+  const { limit, offset } = parseServiceSearch(query);
+  return { limit, offset };
+}
+
 @Injectable()
 export class ProviderServicesService {
   constructor(private readonly port: ProviderServicesPort) {}
@@ -120,10 +126,11 @@ export class ProviderServicesService {
     return { items, limit: search.limit, offset: search.offset };
   }
 
-  async listOwn(token: string, providerId: string): Promise<{ items: ProviderService[] }> {
-    const rows = await this.port.listOwn(token, providerId);
-    if (rows.some(row => row.providerId !== providerId)) throw serviceUnavailable();
-    return { items: rows };
+  async listOwn(token: string, providerId: string, query: unknown): Promise<{ items: ProviderService[]; limit: number; offset: number }> {
+    const page = parseOwnPage(query);
+    const rows = await this.port.listOwn(token, providerId, page);
+    if (rows.length > page.limit || rows.some(row => row.providerId !== providerId)) throw serviceUnavailable();
+    return { items: rows, ...page };
   }
 
   /** Active services for everyone; an inactive one only for its own provider. */
