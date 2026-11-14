@@ -1,7 +1,7 @@
 // Optional probe: applies the provider-approval migration to an isolated postgres:17 container (no network, never pulls images).
 const assert = require('node:assert/strict');
 const { randomBytes } = require('node:crypto');
-const { spawnSync } = require('node:child_process');
+const { spawn, spawnSync } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -81,6 +81,15 @@ async function main() {
     assert.equal(run(`${as(member)} select status from public.request_provider_role();`), 'pending');
     assert.equal(run(`${as(other)} select status from public.request_provider_role();`), 'pending');
     pass('dropping provider requires a fresh approval; rejected members can re-apply');
+
+    const approval = spawn('docker', ['exec', '-i', name, 'psql', '-U', 'postgres', '-X', '-q', '-v', 'ON_ERROR_STOP=1']);
+    const approved = new Promise(resolve => approval.on('close', resolve));
+    approval.stdin.end(`begin; ${as(operator)} select * from public.decide_provider_application('${other}', true); select pg_sleep(1.5); commit;`);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    assert.match(run(`${as(other)} select * from public.request_provider_role();`, false), /Already a provider/);
+    assert.equal(await approved, 0);
+    assert.equal(run(`select status || ':' || p.kind from public.provider_applications a join public.profiles p on p.id = a.user_id where a.user_id = '${other}';`), 'approved:provider');
+    pass('re-applying while an approval commits waits for it and keeps the approval');
   } finally {
     docker(['rm', '--force', '--volumes', name]);
   }

@@ -73,6 +73,7 @@ test('migration guards kind and exposes only operator-gated security-definer RPC
     assert.match(sql, new RegExp(`revoke all on function public\\.${fn.replace(/[()]/g, '\\$&')} from public, anon, authenticated`));
   }
   assert.match(sql, /request_administrators where user_id = caller/);
+  assert.equal(sql.match(/from public\.profiles where id = (caller|applicant) for update/g)?.length, 2);
   assert.doesNotMatch(sql, /grant (insert|update|delete)[^;]*provider_applications/);
 });
 

@@ -43,14 +43,17 @@ create function public.request_provider_role() returns setof public.provider_app
   language plpgsql security definer set search_path = '' as $$
 declare
   caller uuid := auth.uid();
+  current_kind text;
 begin
   if caller is null then
     raise exception 'Authentication required' using errcode = '42501';
   end if;
-  if not exists (select 1 from public.profiles where id = caller) then
+  -- Lock the profile first (same order as decide_provider_application) so a concurrent approval is seen.
+  select kind into current_kind from public.profiles where id = caller for update;
+  if not found then
     raise exception 'Profile required' using errcode = '23503';
   end if;
-  if exists (select 1 from public.profiles where id = caller and kind = 'provider') then
+  if current_kind = 'provider' then
     raise exception 'Already a provider' using errcode = '23505';
   end if;
   return query
@@ -82,6 +85,7 @@ begin
   if applicant is null or approve is null then
     raise exception 'Invalid decision' using errcode = '22023';
   end if;
+  perform 1 from public.profiles where id = applicant for update;
   return query
     with decided as (
       update public.provider_applications a
