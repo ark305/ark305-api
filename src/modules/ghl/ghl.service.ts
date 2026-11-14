@@ -1,5 +1,5 @@
 import { BadRequestException, HttpException, Injectable } from '@nestjs/common';
-import { GHL_ID } from './ghl-config.js';
+import { GHL_ID, GhlConfig } from './ghl-config.js';
 import { GHL_VERSION, GhlClient, ghlUpstream } from './ghl.client.js';
 
 export type GhlContactInput = {
@@ -114,25 +114,25 @@ function mapContact(value: unknown): GhlContact {
 export class GhlService {
   constructor(private readonly client: GhlClient) {}
 
-  async upsertContact(input: GhlContactInput): Promise<{ contact: GhlContact; created: boolean }> {
-    const { locationId } = this.client.config();
+  // Every call runs against `account` (a connected provider's sub-account) or, by default, ARK's own account.
+  async upsertContact(input: GhlContactInput, account: GhlConfig = this.client.config()): Promise<{ contact: GhlContact; created: boolean }> {
     const data = await this.client.request({
       method: 'POST', path: '/contacts/upsert', version: GHL_VERSION.contacts,
-      body: { ...input, locationId, source: input.source ?? 'ARK305' },
-    });
+      body: { ...input, locationId: account.locationId, source: input.source ?? 'ARK305' },
+    }, account);
     return { contact: mapContact(data.contact), created: data.new === true };
   }
 
-  async updateContact(contactId: string, input: GhlContactInput): Promise<GhlContact> {
+  async updateContact(contactId: string, input: GhlContactInput, account?: GhlConfig): Promise<GhlContact> {
     assertGhlId(contactId, 'contact ID');
     const data = await this.client.request({
       method: 'PUT', path: `/contacts/${contactId}`, version: GHL_VERSION.contacts, body: { ...input },
-    });
+    }, account ?? this.client.config());
     return mapContact(data.contact);
   }
 
-  async createServiceOrder(order: GhlServiceOrder): Promise<GhlOpportunity> {
-    const { locationId, pipelineId, pipelineStageId } = this.client.config();
+  async createServiceOrder(order: GhlServiceOrder, account: GhlConfig = this.client.config()): Promise<GhlOpportunity> {
+    const { locationId, pipelineId, pipelineStageId } = account;
     if (!pipelineId) throw new HttpException({ error: 'ghl_pipeline_not_configured' }, 503);
     const data = await this.client.request({
       method: 'POST', path: '/opportunities/', version: GHL_VERSION.opportunities,
@@ -142,7 +142,7 @@ export class GhlService {
         ...(order.monetaryValue !== undefined ? { monetaryValue: order.monetaryValue } : {}),
         source: ['ARK305', order.serviceId && `service:${order.serviceId}`, order.requestId && `request:${order.requestId}`].filter(Boolean).join(' '),
       },
-    });
+    }, account);
     const opportunity = data.opportunity;
     if (!isRecord(opportunity) || typeof opportunity.id !== 'string') throw ghlUpstream();
     return {
@@ -155,20 +155,19 @@ export class GhlService {
     };
   }
 
-  async sendMessage(input: GhlMessageInput): Promise<GhlMessage> {
+  async sendMessage(input: GhlMessageInput, account?: GhlConfig): Promise<GhlMessage> {
     const data = await this.client.request({
       method: 'POST', path: '/conversations/messages', version: GHL_VERSION.conversations,
       body: { type: CHANNEL[input.channel], contactId: input.contactId, message: input.message },
-    });
+    }, account ?? this.client.config());
     if (typeof data.conversationId !== 'string' || typeof data.messageId !== 'string') throw ghlUpstream();
     return { conversationId: data.conversationId, messageId: data.messageId, status: optionalString(data.status) };
   }
 
-  async listCalendars(): Promise<GhlCalendar[]> {
-    const { locationId } = this.client.config();
+  async listCalendars(account: GhlConfig = this.client.config()): Promise<GhlCalendar[]> {
     const data = await this.client.request({
-      method: 'GET', path: '/calendars/', version: GHL_VERSION.calendars, query: { locationId, showDrafted: 'false' },
-    });
+      method: 'GET', path: '/calendars/', version: GHL_VERSION.calendars, query: { locationId: account.locationId, showDrafted: 'false' },
+    }, account);
     if (!Array.isArray(data.calendars)) throw ghlUpstream();
     return data.calendars.filter(isRecord).filter(calendar => typeof calendar.id === 'string').map(calendar => ({
       id: calendar.id as string,
@@ -180,7 +179,7 @@ export class GhlService {
     }));
   }
 
-  async availability(calendarId: string, startDate: unknown, endDate: unknown, timezone?: unknown): Promise<GhlAvailability> {
+  async availability(calendarId: string, startDate: unknown, endDate: unknown, timezone?: unknown, account?: GhlConfig): Promise<GhlAvailability> {
     assertGhlId(calendarId, 'calendar ID');
     const start = parseIsoDate(startDate, 'availability range');
     const end = parseIsoDate(endDate, 'availability range');
@@ -190,7 +189,7 @@ export class GhlService {
     const data = await this.client.request({
       method: 'GET', path: `/calendars/${calendarId}/free-slots`, version: GHL_VERSION.calendars,
       query: { startDate: String(start), endDate: String(end + DAY_MS - 1), ...(zone ? { timezone: zone } : {}) },
-    });
+    }, account ?? this.client.config());
     const days = Object.entries(data)
       .filter(([date, value]) => DATE.test(date) && isRecord(value) && Array.isArray(value.slots))
       .map(([date, value]) => ({ date, slots: ((value as { slots: unknown[] }).slots).filter((slot): slot is string => typeof slot === 'string') }))

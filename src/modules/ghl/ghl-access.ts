@@ -5,6 +5,10 @@ import { getSupabaseConfig } from '../identity/supabase-config.js';
 @Injectable()
 export class GhlAccess {
   async requireOperator(token: string, userId: string): Promise<void> {
+    if (!await this.isOperator(token, userId)) throw new ForbiddenException('GoHighLevel operator required');
+  }
+
+  async isOperator(token: string, userId: string): Promise<boolean> {
     const config = getSupabaseConfig();
     if (!config) throw new ServiceUnavailableException('Operator check unavailable');
     const url = new URL('/rest/v1/request_administrators', config.url);
@@ -24,6 +28,7 @@ export class GhlAccess {
     }
     if (!Array.isArray(rows) || rows.length > 1) throw new ServiceUnavailableException('Operator check unavailable');
     const row = rows[0] as { user_id?: unknown } | undefined;
-    if (!row || row.user_id !== userId) throw new ForbiddenException('GoHighLevel operator required');
+    if (row && row.user_id !== userId) throw new ServiceUnavailableException('Operator check unavailable');
+    return row !== undefined;
   }
 }
