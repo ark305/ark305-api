@@ -31,7 +31,7 @@ function fakePort({ kind = 'member', operators = [] } = {}) {
 test('self-service profile writes never grant provider and file an application instead', () => {
   const service = new ProviderApprovalService(fakePort());
   assert.deepEqual(service.gateKind({ kind: 'provider', name: 'Ada' }, null), { value: { kind: 'member', name: 'Ada' }, requested: true });
-  assert.deepEqual(service.gateKind({ kind: 'provider' }, 'creator'), { value: { kind: 'creator' }, requested: true });
+  assert.deepEqual(service.gateKind({ kind: 'provider', name: 'Ada' }, 'creator'), { value: { name: 'Ada' }, requested: true });
   assert.deepEqual(service.gateKind({ kind: 'provider' }, 'provider'), { value: { kind: 'provider' }, requested: false });
   assert.deepEqual(service.gateKind({ kind: 'creator' }, 'provider'), { value: { kind: 'creator' }, requested: false });
 });
@@ -143,6 +143,7 @@ test('profile and approval routes enforce the provider flow over HTTP', async (t
   assert.ok(writes.every((write) => write.kind !== 'provider'));
 
   const edited = await call('/me', 'member-token', 'PATCH', { ...profile, name: 'Ada L', kind: 'provider' });
+  assert.equal('kind' in writes.at(-1), false);
   assert.equal(edited.status, 200, JSON.stringify(edited.body));
   assert.equal(edited.body.kind, 'member');
   assert.equal((await call('/me/provider-application', 'member-token')).body.application.status, 'pending');

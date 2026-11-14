@@ -123,10 +123,11 @@ export class ProfilesController {
   async updateProfile(@Req() request: AuthenticatedRequest, @Body() body: unknown) {
     const token = accessToken(request); const ownerId = request.principal!.id; const value = validateProfile(body, ownerId, false);
     if (await this.profiles.handleTaken(token, String(value.handle), ownerId)) throw invalid('handle');
-    const gate = this.approvals.gateKind(value, (await this.profiles.findOwn(token, ownerId))?.kind);
+    const current = await this.profiles.findOwn(token, ownerId);
+    const gate = this.approvals.gateKind(value, current ? String(current.kind) : null);
     const profile = await this.profiles.updateProfile(token, ownerId, gate.value);
     if (!profile) throw new BadRequestException('Profile was not updated');
-    return gate.requested ? { ...profile, providerApplication: await this.approvals.apply(token, ownerId) } : profile;
+    return gate.requested && profile.kind !== 'provider' ? { ...profile, providerApplication: await this.approvals.apply(token, ownerId) } : profile;
   }
 
   @Get('me/provider-application') @Header('Cache-Control', 'no-store')

@@ -11,11 +11,14 @@ const DECISIONS: Record<string, boolean> = { approve: true, reject: false };
 export class ProviderApprovalService {
   constructor(private readonly profiles: ProfilesPort) {}
 
-  /** A self-service profile write may never grant `provider`; it files an application instead. */
-  gateKind(value: ProfileInput, currentKind: unknown): { value: ProfileInput; requested: boolean } {
+  /**
+   * A self-service profile write may never grant `provider`; it files an application instead.
+   * New profiles start as `member`; existing ones keep their stored kind (omitted so a concurrent approval is not undone).
+   */
+  gateKind(value: ProfileInput, currentKind: string | null): { value: ProfileInput; requested: boolean } {
     if (value.kind !== 'provider' || currentKind === 'provider') return { value, requested: false };
-    const kept = typeof currentKind === 'string' && currentKind ? currentKind : 'member';
-    return { value: { ...value, kind: kept }, requested: true };
+    const { kind: _requested, ...rest } = value;
+    return { value: currentKind === null ? { ...rest, kind: 'member' } : rest, requested: true };
   }
 
   async apply(token: string, userId: string): Promise<ProviderApplication> {
