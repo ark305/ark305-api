@@ -78,7 +78,7 @@ test('migration guards kind and exposes only operator-gated security-definer RPC
 
 test('profile and approval routes enforce the provider flow over HTTP', async (t) => {
   const saved = Object.fromEntries(['SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY'].map((key) => [key, process.env[key]]));
-  const profiles = new Map(); const applications = new Map(); const writes = [];
+  const profiles = new Map(); const applications = new Map(); const writes = []; const orders = [];
   const caller = (req) => (req.headers.authorization === 'Bearer operator-token' ? operator : member);
   const supabase = createServer(async (req, res) => {
     res.setHeader('Content-Type', 'application/json');
@@ -96,6 +96,7 @@ test('profile and approval routes enforce the provider flow over HTTP', async (t
     }
     if (table === 'request_administrators') return send(id === operator && url.searchParams.get('user_id') === `eq.${operator}` ? [{ user_id: operator }] : []);
     if (table === 'provider_applications') {
+      if (url.searchParams.has('order')) orders.push(url.searchParams.get('order'));
       const status = url.searchParams.get('status')?.slice(3); const user = url.searchParams.get('user_id')?.slice(3);
       const rows = [...applications.values()].filter((row) => (id === operator || row.user_id === id) && (!status || row.status === status) && (!user || row.user_id === user));
       return send(rows.map((row) => (url.searchParams.get('select').includes('profile:') ? { ...row, profile: { handle: profiles.get(row.user_id)?.handle, name: 'Ada', kind: profiles.get(row.user_id)?.kind } } : row)));
@@ -155,6 +156,8 @@ test('profile and approval routes enforce the provider flow over HTTP', async (t
   assert.equal(approved.status, 200);
   assert.equal(approved.body.application.status, 'approved');
   assert.equal(profiles.get(member).kind, 'provider');
+  assert.equal((await call('/provider-applications?status=approved', 'operator-token')).body.items[0].status, 'approved');
+  assert.deepEqual(orders, ['requested_at.asc', 'decided_at.desc']);
   assert.equal((await call(`/provider-applications/${member}/reject`, 'operator-token', 'POST')).status, 404);
   assert.equal((await call('/me/provider-application', 'member-token', 'POST')).status, 409);
 

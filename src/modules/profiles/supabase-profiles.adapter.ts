@@ -92,7 +92,7 @@ export class SupabaseProfilesAdapter extends ProfilesPort {
 
   async listProviderApplications(token: string, status: ProviderApplicationStatus) {
     const rows = await this.list<ApplicationRow>('provider_applications', token, `${APPLICATION_COLUMNS},profile:profiles(handle,name,kind)`,
-      { status: `eq.${status}`, order: 'requested_at.asc', limit: '100' });
+      { status: `eq.${status}`, order: status === 'pending' ? 'requested_at.asc' : 'decided_at.desc', limit: '100' });
     return rows.map(toApplication);
   }
 
