@@ -24,7 +24,9 @@ En el repositorio web, configurar `.env.local` con `ARK_API_URL=http://127.0.0.1
 - Solicitudes: creación, historial y gestión administrativa autorizada; cerrar no confirma una reserva ni un pago.
 - Catálogo: demostración, sin disponibilidad de proveedores confirmada.
 
-Contratos: [IA](AI.md), [autenticación](AUTH.md), [perfiles](PROFILES.md) y [solicitudes](REQUESTS.md).
+- GoHighLevel: contactos, oportunidades, SMS/WhatsApp y disponibilidad de calendarios (API v2).
+
+Contratos: [IA](AI.md), [autenticación](AUTH.md), [perfiles](PROFILES.md), [solicitudes](REQUESTS.md) y [GoHighLevel](GHL.md).
 
 ## Snapshot
 
