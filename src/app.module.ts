@@ -7,6 +7,7 @@ import { AiModule } from './modules/ai/ai.module.js';
 import { ProfilesModule } from './modules/profiles/profiles.module.js';
 import { GhlModule } from './modules/ghl/ghl.module.js';
 import { TrackingModule } from './modules/tracking/tracking.module.js';
+import { ProviderServicesModule } from './modules/provider-services/provider-services.module.js';
 
-@Module({ imports: [IdentityModule, HealthModule, CatalogModule, RequestsModule, AiModule, ProfilesModule, GhlModule, TrackingModule] })
+@Module({ imports: [IdentityModule, HealthModule, CatalogModule, RequestsModule, AiModule, ProfilesModule, GhlModule, TrackingModule, ProviderServicesModule] })
 export class AppModule {}
